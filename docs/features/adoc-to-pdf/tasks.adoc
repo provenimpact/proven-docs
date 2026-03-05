@@ -1,0 +1,97 @@
+= Implementation Tasks: AsciiDoc to PDF
+:version: 1.0.0
+:status: Implemented
+:source-design-version: 1.0.0
+:source-stories-version: 1.0.0
+:source-spec-version: 1.0.0
+:last-updated: 2026-03-05
+:feature: adoc-to-pdf
+:toc:
+
+== Overview
+
+Implement the adoc-to-pdf rendering pipeline: a CLI command that converts AsciiDoc files to PDF via headless browser printing. 3 phases, 7 tasks.
+
+== Phase 1: Foundation
+
+Set up the project structure, executable entry point, and CLI skeleton.
+
+* [x] TASK-001: Create the executable entry point and CLI skeleton [sequential]
++
+Components:: bin/proven-docs.js, src/cli.js
+Stories:: US-004
+Specs:: PDF-010, PDF-011
+Description:: Create `bin/proven-docs.js` with shebang and import. Create `src/cli.js` with Commander program definition: a `render <input>` command with `-o, --output <path>` option. Add the `bin` field to `package.json`. Verify `--help` output works.
+
+== Phase 2: Core Pipeline
+
+Implement the AsciiDoc renderer and PDF printer modules.
+
+* [x] TASK-002: Implement the AsciiDoc renderer module [parallel]
++
+Components:: src/render.js
+Stories:: US-001
+Specs:: PDF-002
+Description:: Create `src/render.js` exporting `renderToHtml(source)`. Use `@asciidoctor/core` to convert AsciiDoc text to a standalone HTML document (`standalone: true`, `safe: 'safe'`). Return the HTML string.
+
+* [x] TASK-003: Implement the PDF printer module [parallel]
++
+Components:: src/print.js
+Stories:: US-001
+Specs:: PDF-003
+Description:: Create `src/print.js` exporting `printToPdf(html, outputPath)`. Launch headless Chromium via `playwright`, set page content with `waitUntil: 'load'`, call `page.pdf({ path: outputPath, format: 'A4', printBackground: true })`. Ensure browser cleanup in a try/finally block.
+
+== Phase 3: Integration and Error Handling
+
+Wire the pipeline into the CLI command, add input validation, error handling, and exit codes.
+
+* [x] TASK-004: Wire the render pipeline into the CLI command [sequential]
++
+Components:: src/cli.js, src/render.js, src/print.js
+Stories:: US-001, US-002
+Specs:: PDF-001, PDF-004, PDF-005
+Description:: In the `render` command action handler: read the input file, call `renderToHtml()`, resolve the output path (replace `.adoc` with `.pdf`, or use `--output` if provided), call `printToPdf()`, print success message. Handle default output path resolution and `--output` override.
+
+* [x] TASK-005: Add input file validation [parallel]
++
+Components:: src/cli.js
+Stories:: US-003
+Specs:: PDF-006, PDF-007
+Description:: Before reading the file, check it exists and is readable using `fs.access()`. If not found, print `Error: File not found: <path>` to stderr and exit with code 1. If not readable, print `Error: Cannot read file: <path>` and exit with code 1.
+
+* [x] TASK-006: Add rendering and browser error handling [parallel]
++
+Components:: src/cli.js
+Stories:: US-003
+Specs:: PDF-008, PDF-009
+Description:: Wrap the render and print calls in try/catch. If Asciidoctor produces errors, report them to stderr. If Playwright fails to launch the browser, catch the error and print a diagnostic message. Exit with code 1 on any failure.
+
+* [x] TASK-007: Ensure correct exit codes [sequential]
++
+Components:: src/cli.js
+Stories:: US-004
+Specs:: PDF-012, PDF-013
+Description:: Verify all success paths exit with code 0 and all error paths exit with code 1. Ensure Commander does not swallow errors or override exit codes.
+
+== Traceability
+
+[cols="1,1,1", options="header"]
+|===
+| Story | Spec IDs | Tasks
+
+| US-001: Convert AsciiDoc File to PDF
+| PDF-001, PDF-002, PDF-003, PDF-004
+| TASK-002, TASK-003, TASK-004
+
+| US-002: Predictable Output Location
+| PDF-004, PDF-005
+| TASK-004
+
+| US-003: Conversion Error Reporting
+| PDF-006, PDF-007, PDF-008, PDF-009
+| TASK-005, TASK-006
+
+| US-004: CLI Integration
+| PDF-010, PDF-011, PDF-012, PDF-013
+| TASK-001, TASK-007
+|===

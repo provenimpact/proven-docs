@@ -1,0 +1,52 @@
+= User Stories: AsciiDoc to PDF
+:version: 1.0.0
+:last-updated: 2026-03-05
+:feature: adoc-to-pdf
+:toc:
+
+== US-001: Convert AsciiDoc File to PDF
+As a documentation author,
+I want to convert an AsciiDoc file to a PDF,
+so that I can produce a print-ready document for distribution.
+
+Acceptance Criteria:
+
+* [ ] When the user runs the render command with a path to an .adoc file, the system shall produce a PDF file in the same directory as the input file.
+* [ ] The system shall render the AsciiDoc source to HTML using asciidoctor.js.
+* [ ] The system shall open the rendered HTML in a headless Chromium browser and print it to PDF.
+* [ ] The system shall save the PDF with the same base name as the input file but with a .pdf extension (e.g., report.adoc produces report.pdf).
+* [ ] The system shall complete the conversion without requiring a network connection.
+
+== US-002: Predictable Output Location
+As a documentation author,
+I want the PDF output to appear alongside my source file by default,
+so that I can find it without guessing where it went.
+
+Acceptance Criteria:
+
+* [ ] The system shall write the output PDF to the same directory as the input .adoc file.
+* [ ] When the user specifies an output path, the system shall write the PDF to that path instead.
+
+== US-003: Conversion Error Reporting
+As a documentation author,
+I want clear error messages when conversion fails,
+so that I can diagnose and fix problems quickly.
+
+Acceptance Criteria:
+
+* [ ] If the specified input file does not exist, then the system shall exit with a non-zero exit code and print an error message identifying the missing file.
+* [ ] If the specified input file is not readable, then the system shall exit with a non-zero exit code and print an error message.
+* [ ] If the AsciiDoc rendering produces errors, then the system shall report the rendering errors to the user.
+* [ ] If the headless browser fails to launch, then the system shall exit with a non-zero exit code and print a diagnostic message.
+
+== US-004: CLI Integration
+As a documentation author,
+I want to invoke the conversion from the command line,
+so that I can integrate it into scripts and CI pipelines.
+
+Acceptance Criteria:
+
+* [ ] The system shall provide a CLI command that accepts an input file path as an argument.
+* [ ] When the user runs the command with --help, the system shall display usage information.
+* [ ] The system shall exit with code 0 on successful conversion.
+* [ ] The system shall exit with a non-zero exit code on failure.

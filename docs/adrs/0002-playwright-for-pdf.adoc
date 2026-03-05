@@ -1,0 +1,36 @@
+= ADR-0002: Use Playwright with Chromium for Headless PDF Printing
+:status: Accepted
+:date: 2026-03-05
+:deciders: Project team
+
+== Context
+
+After rendering AsciiDoc to HTML, the system needs to convert that HTML to a high-fidelity PDF. The PDF must faithfully reproduce the browser-rendered layout, including CSS styling, fonts, and page formatting.
+
+The development environment already has Playwright's Chromium browsers cached at `~/Library/Caches/ms-playwright/`. The tool must work fully offline (project constraint).
+
+== Decision
+
+Use Playwright's `page.pdf()` API with the bundled Chromium browser for HTML-to-PDF conversion via headless browser printing.
+
+== Consequences
+
+* PDF output matches exactly what a user would see printing from a browser -- high CSS fidelity.
+* Playwright handles browser lifecycle management (launch, page creation, cleanup).
+* The Chromium binary is bundled with Playwright and works offline after initial install.
+* Playwright is a substantial dependency (~3 MB npm package, plus ~150 MB browser binaries). However, browsers are shared across projects and only downloaded once.
+* PDF generation speed is bounded by browser startup time (typically 0.5-2 seconds).
+
+== Alternatives Considered
+
+=== Puppeteer / Puppeteer-core
+Similar API to Playwright for headless PDF. Puppeteer-core is lighter (no bundled browser) but requires manual browser path configuration. Rejected in favor of Playwright because Playwright browsers were already cached on the development system, and Playwright's API is slightly more ergonomic for this use case.
+
+=== Asciidoctor PDF (Ruby)
+A Ruby gem that converts AsciiDoc directly to PDF using Prawn. Rejected because it requires a Ruby runtime (violating the single-ecosystem goal of ADR-0001), and its PDF output uses a different rendering model than browsers, making it harder to achieve CSS-consistent results.
+
+=== WeasyPrint
+A Python-based HTML-to-PDF engine. Rejected because it introduces a Python runtime dependency and has less complete CSS support than Chromium's rendering engine.
+
+=== Prince XML
+A commercial HTML-to-PDF converter with excellent CSS support. Rejected due to its commercial license requirement and the additional binary dependency.

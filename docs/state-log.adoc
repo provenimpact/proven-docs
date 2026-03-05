@@ -1,0 +1,15 @@
+= State Transition Log
+:last-updated: 2026-03-05
+
+== TRANSITION-001
+:date: 2026-03-05
+:intent: CLI command converts AsciiDoc files to PDF via headless browser printing
+:type: Feature evolution
+:risk: High
+:features: adoc-to-pdf (new)
+:desired-state: A CLI command takes an .adoc file path, renders it to HTML via @asciidoctor/core, opens the HTML in a headless Chromium browser via Playwright, prints to PDF, and saves it as <filename>.pdf
+:prior-state: Greenfield project -- no features, no code, no package.json
+:capabilities-invoked: needs-stories, needs-spec, needs-design, needs-adr, needs-tasks, needs-tests, needs-implementation, needs-architecture
+:constraints-checked: Licensing (pass -- all dependencies MIT/Apache-2.0/ISC/BSD), Connectivity (pass -- no network requests during operation)
+:result: Achieved
+:artifacts-modified: docs/features/adoc-to-pdf/user-stories.adoc (v1.0.0), docs/features/adoc-to-pdf/spec.adoc (v1.0.0), docs/features/adoc-to-pdf/design.adoc (v1.0.0), docs/features/adoc-to-pdf/tasks.adoc (v1.0.0), docs/adrs/0001-asciidoctor-js-for-rendering.adoc, docs/adrs/0002-playwright-for-pdf.adoc, docs/adrs/0003-commander-for-cli.adoc, docs/adrs/index.adoc (v1.0.0), docs/architecture.adoc (v1.0.0), docs/constraints.adoc (v1.0.0), src/cli.js, src/render.js, src/print.js, bin/proven-docs.js, package.json, tests/features/adoc-to-pdf/render.test.js, tests/features/adoc-to-pdf/print.test.js, tests/features/adoc-to-pdf/cli.test.js

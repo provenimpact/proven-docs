@@ -1,0 +1,32 @@
+= ADR-0003: Use Commander.js for CLI Framework
+:status: Accepted
+:date: 2026-03-05
+:deciders: Project team
+
+== Context
+
+Proven Docs is a CLI tool that needs argument parsing, help text generation, and subcommand support. The project is a Node.js ESM application that will grow to support multiple subcommands (render, publish, sign, verify).
+
+== Decision
+
+Use `commander` (Commander.js) as the CLI framework.
+
+== Consequences
+
+* Mature, well-documented library with a stable API.
+* Built-in help text generation from command definitions.
+* Supports subcommands, options, and positional arguments out of the box.
+* MIT licensed (satisfies the no-copyleft constraint).
+* Small dependency footprint (zero transitive dependencies).
+* The project follows Commander's patterns for adding future subcommands.
+
+== Alternatives Considered
+
+=== Yargs
+A popular CLI framework with a builder-pattern API. Rejected because it has a larger dependency tree and Commander's API is simpler for the straightforward command structure needed here.
+
+=== Node.js built-in parseArgs (util.parseArgs)
+Available since Node 18. Handles basic argument parsing but does not provide help text generation, subcommand support, or structured error messages. Rejected because the additional boilerplate required would exceed the effort saved by avoiding a dependency.
+
+=== Citty / CAC
+Lighter CLI frameworks. Rejected because they are less widely adopted and Commander's ecosystem maturity is preferred for a tool that aims to be CI-friendly and well-documented.

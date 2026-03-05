@@ -1,0 +1,22 @@
+{
+  "name": "proven-docs",
+  "version": "0.1.0",
+  "description": "Docs-as-Code CLI for creating verifiable, publishable documentation artifacts using AsciiDoc.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "bin": {
+    "proven-docs": "bin/proven-docs.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "dependencies": {
+    "@asciidoctor/core": "^3.0.4",
+    "commander": "^14.0.3",
+    "playwright": "^1.58.2"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
+  }
+}

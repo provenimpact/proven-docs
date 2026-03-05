@@ -1,0 +1,159 @@
+= Specification: AsciiDoc to PDF
+:version: 1.0.0
+:source-stories-version: 1.0.0
+:last-updated: 2026-03-05
+:feature: adoc-to-pdf
+:prefix: PDF
+:toc:
+
+== PDF-001
+When the user runs the render command with a path to an .adoc file, the system shall produce a PDF file in the same directory as the input file.
+
+Type:: Event-driven
+Source:: US-001: Criterion 1
+Verification:: Run the render command with a valid .adoc file. Confirm that a PDF file appears in the same directory as the input file.
+
+== PDF-002
+The system shall render AsciiDoc content to HTML before converting it to PDF.
+
+Type:: Ubiquitous
+Source:: US-001: Criterion 2
+Verification:: Provide an .adoc file containing AsciiDoc formatting (headings, lists, bold text). Run the render command. Open the resulting PDF and confirm that all AsciiDoc formatting is faithfully represented.
+
+== PDF-003
+The system shall produce the PDF by printing the rendered HTML in a headless browser.
+
+Type:: Ubiquitous
+Source:: US-001: Criterion 3
+Verification:: Run the render command on a valid .adoc file. Confirm that a PDF file is produced. Confirm that the PDF content matches the rendered HTML (layout, fonts, styles are consistent with browser rendering).
+
+== PDF-004
+The system shall name the output PDF with the same base name as the input file, using a .pdf extension.
+
+Type:: Ubiquitous
+Source:: US-001: Criterion 4, US-002: Criterion 1
+Verification:: Run the render command on a file named `report.adoc`. Confirm the output is named `report.pdf` in the same directory. Repeat with files named `my-spec.adoc`, `README.adoc`, and confirm naming follows the same pattern.
+
+== PDF-005
+When the user specifies an output path, the system shall write the PDF to that path instead of the default location.
+
+Type:: Event-driven
+Source:: US-002: Criterion 2
+Verification:: Run the render command with an .adoc file and an explicit output path argument. Confirm the PDF is written to the specified path, not the default location.
+
+== PDF-006
+If the specified input file does not exist, then the system shall exit with a non-zero exit code and print an error message that identifies the missing file by name.
+
+Type:: Unwanted behavior
+Source:: US-003: Criterion 1
+Verification:: Run the render command with a path to a file that does not exist. Confirm the process exits with a non-zero code and the error message includes the file path.
+
+== PDF-007
+If the specified input file is not readable, then the system shall exit with a non-zero exit code and print an error message.
+
+Type:: Unwanted behavior
+Source:: US-003: Criterion 2
+Verification:: Run the render command with a path to a file that exists but has no read permissions. Confirm the process exits with a non-zero code and an error message is printed.
+
+== PDF-008
+If the AsciiDoc rendering produces errors, then the system shall report the rendering errors to the user.
+
+Type:: Unwanted behavior
+Source:: US-003: Criterion 3
+Verification:: Run the render command with an .adoc file containing malformed content. Confirm that rendering errors are reported to the user via standard error output.
+
+== PDF-009
+If the headless browser fails to launch, then the system shall exit with a non-zero exit code and print a diagnostic message.
+
+Type:: Unwanted behavior
+Source:: US-003: Criterion 4
+Verification:: Run the render command in an environment where the browser binary is unavailable. Confirm the process exits with a non-zero code and a diagnostic message is printed indicating the browser launch failure.
+
+== PDF-010
+The system shall provide a CLI command that accepts an input file path as a positional argument.
+
+Type:: Ubiquitous
+Source:: US-004: Criterion 1
+Verification:: Run the CLI with a file path as a positional argument. Confirm the system accepts it and attempts conversion.
+
+== PDF-011
+When the user runs the command with --help, the system shall display usage information describing available arguments and options.
+
+Type:: Event-driven
+Source:: US-004: Criterion 2
+Verification:: Run the command with --help. Confirm that usage information is printed, including the input file argument and any options.
+
+== PDF-012
+When conversion completes successfully, the system shall exit with code 0.
+
+Type:: Event-driven
+Source:: US-004: Criterion 3
+Verification:: Run the render command with a valid .adoc file. Confirm the process exit code is 0.
+
+== PDF-013
+When conversion fails, the system shall exit with a non-zero exit code.
+
+Type:: Event-driven
+Source:: US-004: Criterion 4, US-003: Criterion 1, US-003: Criterion 2, US-003: Criterion 4
+Verification:: Run the render command with an invalid input (missing file, unreadable file, broken browser). Confirm the process exit code is non-zero in each case.
+
+NOTE: Offline operation is enforced by the project-wide Connectivity constraint ("The tool must work fully offline. No network requests are required during normal operation.") and is not duplicated here.
+
+== Traceability
+
+[cols="1,2,2", options="header"]
+|===
+| Requirement ID | Requirement Summary | Source
+
+| PDF-001
+| Produce PDF in same directory as input
+| US-001: Criterion 1
+
+| PDF-002
+| Render AsciiDoc to HTML
+| US-001: Criterion 2
+
+| PDF-003
+| PDF via headless browser printing
+| US-001: Criterion 3
+
+| PDF-004
+| Output file naming convention
+| US-001: Criterion 4, US-002: Criterion 1
+
+| PDF-005
+| Custom output path
+| US-002: Criterion 2
+
+| PDF-006
+| Error on missing input file
+| US-003: Criterion 1
+
+| PDF-007
+| Error on unreadable input file
+| US-003: Criterion 2
+
+| PDF-008
+| Report AsciiDoc rendering errors
+| US-003: Criterion 3
+
+| PDF-009
+| Error on browser launch failure
+| US-003: Criterion 4
+
+| PDF-010
+| CLI positional argument
+| US-004: Criterion 1
+
+| PDF-011
+| --help displays usage
+| US-004: Criterion 2
+
+| PDF-012
+| Exit code 0 on success
+| US-004: Criterion 3
+
+| PDF-013
+| Non-zero exit code on failure
+| US-004: Criterion 4, US-003: Criteria 1, 2, 4
+|===

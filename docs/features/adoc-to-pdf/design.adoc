@@ -1,0 +1,232 @@
+= Design: AsciiDoc to PDF
+:version: 1.0.0
+:status: Current
+:source-stories-version: 1.0.0
+:source-spec-version: 1.0.0
+:last-updated: 2026-03-05
+:feature: adoc-to-pdf
+:toc:
+
+== Technical Context
+
+Proven Docs is a greenfield Node.js ESM CLI tool for converting AsciiDoc documentation to publishable artifacts. This feature implements the core rendering pipeline: AsciiDoc source to HTML (via asciidoctor.js) to PDF (via headless Chromium printing).
+
+The project has no existing code. Dependencies are installed: `@asciidoctor/core`, `playwright`, `commander`.
+
+== Decisions and Constraints
+
+* <<../../adrs/0001-asciidoctor-js-for-rendering.adoc#,ADR-0001>>: Use @asciidoctor/core for AsciiDoc rendering
+* <<../../adrs/0002-playwright-for-pdf.adoc#,ADR-0002>>: Use Playwright with Chromium for headless PDF printing
+* <<../../adrs/0003-commander-for-cli.adoc#,ADR-0003>>: Use Commander.js for CLI framework
+
+Project constraints:
+
+* **Licensing**: No copyleft-licensed dependencies. All current dependencies use permissive licenses (MIT, Apache-2.0, ISC).
+* **Connectivity**: Must work fully offline. No network requests during normal operation.
+
+== Research and Unknowns
+
+All unknowns have been resolved:
+
+* **Playwright browser availability**: Playwright ships browser binaries via `npx playwright install`. Once installed, browsers are cached locally and work offline. The `chromium` channel is used (not `chrome` or `msedge`).
+* **`page.pdf()` API**: Playwright's `page.pdf()` produces a PDF from the rendered page using Chromium's print-to-PDF engine. It supports `format` (A4, Letter), `printBackground`, `margin`, and other print options. It requires the browser to be launched in headless mode (the default).
+* **`@asciidoctor/core` output**: The `convert()` method returns an HTML string (document body). For a complete HTML document with `<html>`, `<head>`, `<body>` tags, set the `standalone` option to `true`. A standalone document is required for proper browser rendering with styles.
+
+== System Design
+
+The feature is a three-stage pipeline with a CLI entry point.
+
+[source,mermaid]
+----
+flowchart LR
+    CLI["CLI Entry Point\n(commander)"]
+    RENDER["AsciiDoc Renderer\n(@asciidoctor/core)"]
+    PRINT["PDF Printer\n(playwright)"]
+    FS["File System"]
+
+    CLI -->|"input path,\noptions"| RENDER
+    FS -->|".adoc content"| RENDER
+    RENDER -->|"HTML string"| PRINT
+    PRINT -->|".pdf bytes"| FS
+----
+
+=== Module Structure
+
+....
+src/
+├── cli.js            # CLI entry point and command definitions
+├── render.js         # AsciiDoc-to-HTML rendering
+└── print.js          # HTML-to-PDF via headless browser
+bin/
+└── proven-docs.js    # Executable entry point (shebang + import cli)
+....
+
+=== CLI Entry Point (`src/cli.js`)
+
+Responsibility: Parse command-line arguments, orchestrate the render-then-print pipeline, handle top-level errors, and set exit codes.
+
+Uses Commander.js to define:
+
+* Command: `render <input>` — the primary subcommand
+* Positional argument: `<input>` — path to .adoc file (required)
+* Option: `-o, --output <path>` — override output file path
+* Automatic `--help` generation from Commander
+
+The `render` command handler:
+
+1. Validates the input file exists and is readable
+2. Calls the renderer to produce HTML
+3. Calls the printer to produce PDF
+4. Reports success or failure
+5. Exits with appropriate code
+
+[source,mermaid]
+----
+sequenceDiagram
+    participant User
+    participant CLI as cli.js
+    participant Render as render.js
+    participant Print as print.js
+    participant FS as File System
+
+    User->>CLI: proven-docs render report.adoc
+    CLI->>FS: Check file exists & readable
+    FS-->>CLI: OK
+    CLI->>FS: Read file content
+    FS-->>CLI: AsciiDoc source
+    CLI->>Render: renderToHtml(source)
+    Render-->>CLI: HTML string
+    CLI->>Print: printToPdf(html, outputPath)
+    Print->>Print: Launch headless Chromium
+    Print->>Print: Set page content (HTML)
+    Print->>Print: page.pdf() → PDF bytes
+    Print->>FS: Write PDF file
+    Print-->>CLI: Success
+    CLI->>User: "Created report.pdf"
+----
+
+=== AsciiDoc Renderer (`src/render.js`)
+
+Responsibility: Convert AsciiDoc source text to a complete HTML document.
+
+Exports a single function:
+
+* `renderToHtml(source: string): string` — takes raw AsciiDoc text, returns a standalone HTML document string.
+
+Implementation:
+
+1. Import `Asciidoctor` from `@asciidoctor/core`
+2. Create a processor instance
+3. Call `processor.convert(source, { standalone: true, safe: 'safe' })`
+4. Return the HTML string
+
+The `standalone: true` option produces a full HTML document (`<html>`, `<head>`, `<body>`) with the default Asciidoctor stylesheet embedded. The `safe: 'safe'` mode prevents the document from including external files or running scripts (appropriate for a rendering pipeline).
+
+=== PDF Printer (`src/print.js`)
+
+Responsibility: Take an HTML string, render it in a headless Chromium browser, and print to PDF.
+
+Exports a single function:
+
+* `printToPdf(html: string, outputPath: string): Promise<void>` — launches a headless browser, loads the HTML, prints to PDF, writes the file, and closes the browser.
+
+Implementation:
+
+1. Import `chromium` from `playwright`
+2. Launch a headless browser: `chromium.launch()`
+3. Create a new page: `browser.newPage()`
+4. Set the page content: `page.setContent(html, { waitUntil: 'load' })` — wait for load event so embedded styles are applied
+5. Print to PDF: `page.pdf({ path: outputPath, format: 'A4', printBackground: true })`
+6. Close the browser: `browser.close()`
+7. Ensure browser cleanup happens even on error (try/finally)
+
+The `printBackground: true` option is important for AsciiDoc documents that use background colors in admonition blocks, code blocks, and table headers.
+
+=== Executable Entry Point (`bin/proven-docs.js`)
+
+A thin shebang wrapper:
+
+[source,javascript]
+----
+#!/usr/bin/env node
+import '../src/cli.js';
+----
+
+The `package.json` `bin` field maps `proven-docs` to this file.
+
+=== Error Handling Strategy
+
+Errors are caught at the CLI level and reported to stderr:
+
+[cols="1,2,2", options="header"]
+|===
+| Error Type | Detection | User Message
+
+| Input file not found
+| `fs.access()` before reading
+| `Error: File not found: <path>`
+
+| Input file not readable
+| `fs.access(R_OK)` failure
+| `Error: Cannot read file: <path>`
+
+| AsciiDoc rendering error
+| Asciidoctor logs errors via its logger API
+| `Error: AsciiDoc rendering failed: <details>`
+
+| Browser launch failure
+| Playwright throws on `chromium.launch()`
+| `Error: Failed to launch browser: <details>`
+
+| PDF write failure
+| File system error during write
+| `Error: Failed to write PDF: <path>: <details>`
+|===
+
+All error paths exit with code 1. Success exits with code 0.
+
+=== Output Path Resolution
+
+Default behavior: replace the input file's `.adoc` extension with `.pdf`.
+
+* `docs/report.adoc` → `docs/report.pdf`
+* `/abs/path/spec.adoc` → `/abs/path/spec.pdf`
+
+When `--output` is specified, use the provided path directly. If the output path is a directory, write `<basename>.pdf` into that directory.
+
+== Story Resolution
+
+=== US-001: Convert AsciiDoc File to PDF
+
+Components:: CLI Entry Point, AsciiDoc Renderer, PDF Printer
+Criteria::
+* When the user runs the render command with a path to an .adoc file, the system shall produce a PDF file in the same directory as the input file → CLI resolves output path from input path, Renderer produces HTML, Printer writes PDF (PDF-001)
+* The system shall render the AsciiDoc source to HTML using asciidoctor.js → AsciiDoc Renderer uses `@asciidoctor/core` `convert()` with `standalone: true` (PDF-002)
+* The system shall open the rendered HTML in a headless Chromium browser and print it to PDF → PDF Printer uses `playwright` `chromium.launch()` + `page.pdf()` (PDF-003)
+* The system shall save the PDF with the same base name as the input file but with a .pdf extension → Output Path Resolution logic replaces `.adoc` with `.pdf` (PDF-004)
+* The system shall complete the conversion without requiring a network connection → Covered by project Connectivity constraint. Playwright uses locally cached Chromium binary; no network calls in the pipeline.
+
+=== US-002: Predictable Output Location
+
+Components:: CLI Entry Point (output path resolution)
+Criteria::
+* The system shall write the output PDF to the same directory as the input .adoc file → Default output path resolution: replace `.adoc` with `.pdf` in the same directory (PDF-004)
+* When the user specifies an output path, the system shall write the PDF to that path instead → `--output` option parsed by Commander, passed to Printer (PDF-005)
+
+=== US-003: Conversion Error Reporting
+
+Components:: CLI Entry Point (error handling)
+Criteria::
+* If the specified input file does not exist → `fs.access()` check before reading, error message includes file path (PDF-006)
+* If the specified input file is not readable → `fs.access(R_OK)` check, error message printed (PDF-007)
+* If the AsciiDoc rendering produces errors → Asciidoctor logger captures errors, reported to user (PDF-008)
+* If the headless browser fails to launch → Playwright error caught, diagnostic message printed (PDF-009)
+
+=== US-004: CLI Integration
+
+Components:: CLI Entry Point, Executable Entry Point
+Criteria::
+* The system shall provide a CLI command that accepts an input file path as an argument → Commander `render <input>` command definition (PDF-010)
+* When the user runs the command with --help → Commander auto-generates help from command definition (PDF-011)
+* The system shall exit with code 0 on successful conversion → CLI handler calls `process.exit(0)` on success path (PDF-012)
+* The system shall exit with a non-zero exit code on failure → CLI error handler calls `process.exit(1)` on all error paths (PDF-013)

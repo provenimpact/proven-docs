@@ -1,0 +1,30 @@
+= ADR-0001: Use @asciidoctor/core (JavaScript) for AsciiDoc Rendering
+:status: Accepted
+:date: 2026-03-05
+:deciders: Project team
+
+== Context
+
+Proven Docs needs to convert AsciiDoc source files to HTML as an intermediate step before PDF generation. Two viable AsciiDoc processors are available: the original Ruby-based Asciidoctor and its JavaScript port @asciidoctor/core.
+
+The project is a Node.js CLI tool. Introducing a Ruby runtime dependency would complicate installation and CI setup. The tool must work fully offline (project constraint).
+
+== Decision
+
+Use `@asciidoctor/core` (the JavaScript/npm package) for rendering AsciiDoc to HTML.
+
+== Consequences
+
+* The entire toolchain stays within the Node.js ecosystem -- no external runtime required.
+* Installation is a single `npm install` with no system-level dependencies.
+* CI pipelines do not need Ruby configured.
+* Some Asciidoctor extensions that are Ruby-only will not be available. If these are needed in the future, this decision may need revisiting.
+* The JavaScript port tracks the Ruby version closely but may lag behind on edge-case features.
+
+== Alternatives Considered
+
+=== Asciidoctor (Ruby)
+The canonical AsciiDoc processor with the broadest extension ecosystem. Rejected because it introduces a Ruby runtime dependency, complicating installation for a Node.js CLI tool. The JS port provides all the rendering features needed for this use case.
+
+=== Pandoc
+A universal document converter that supports AsciiDoc input. Rejected because it requires a separate binary (Haskell runtime), has less complete AsciiDoc support than Asciidoctor, and adds unnecessary complexity for a focused adoc-to-PDF workflow.

@@ -1,0 +1,24 @@
+= Architecture Decision Records
+:version: 1.0.0
+:last-updated: 2026-03-05
+:toc:
+
+[cols="1,3,1,1", options="header"]
+|===
+| ADR | Decision | Status | Date
+
+| <<0001-asciidoctor-js-for-rendering.adoc#,ADR-0001>>
+| Use @asciidoctor/core (JavaScript) for AsciiDoc rendering
+| Accepted
+| 2026-03-05
+
+| <<0002-playwright-for-pdf.adoc#,ADR-0002>>
+| Use Playwright with Chromium for headless PDF printing
+| Accepted
+| 2026-03-05
+
+| <<0003-commander-for-cli.adoc#,ADR-0003>>
+| Use Commander.js for CLI framework
+| Accepted
+| 2026-03-05
+|===

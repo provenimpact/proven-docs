@@ -1,0 +1,11 @@
+= Project Constraints
+:version: 1.0.0
+:last-updated: 2026-03-05
+
+== Licensing
+
+* No copyleft-licensed dependencies are permitted. Only permissive licenses (MIT, Apache-2.0, BSD, ISC) are allowed.
+
+== Connectivity
+
+* The tool must work fully offline. No network requests are required during normal operation.

@@ -1,0 +1,120 @@
+= System Architecture
+:version: 1.0.0
+:last-updated: 2026-03-05
+:toc:
+
+== Feature Design Sources
+
+[cols="1,1", options="header"]
+|===
+| Feature | Design Version
+
+| adoc-to-pdf | 1.0.0
+|===
+
+== Overview
+
+Proven Docs is a Node.js CLI tool for converting AsciiDoc documentation to publishable PDF artifacts. It implements a rendering pipeline: AsciiDoc source is converted to HTML, then the HTML is printed to PDF using a headless Chromium browser.
+
+The tool is designed to work fully offline, integrate into CI pipelines, and produce deterministic output.
+
+== System Context (C4 Level 1)
+
+The system has a single user type (documentation author) and no external system dependencies.
+
+[source,mermaid]
+----
+C4Context
+  title System Context Diagram - Proven Docs
+
+  Person(author, "Documentation Author", "Creates and maintains AsciiDoc documentation")
+  System(provendocs, "Proven Docs CLI", "Converts AsciiDoc files to PDF via headless browser printing")
+  System_Ext(filesystem, "File System", "Source .adoc files and output .pdf files")
+
+  Rel(author, provendocs, "Runs CLI commands")
+  Rel(provendocs, filesystem, "Reads .adoc, writes .pdf")
+----
+
+== Container View (C4 Level 2)
+
+Proven Docs is a single CLI process with three internal modules. The headless Chromium browser is a runtime dependency managed by Playwright.
+
+[source,mermaid]
+----
+C4Container
+  title Container Diagram - Proven Docs
+
+  Person(author, "Documentation Author", "Runs CLI commands")
+
+  System_Boundary(provendocs, "Proven Docs") {
+    Container(cli, "CLI", "Node.js / Commander.js", "Parses arguments, orchestrates pipeline, handles errors")
+    Container(renderer, "AsciiDoc Renderer", "Node.js / @asciidoctor/core", "Converts AsciiDoc source to standalone HTML")
+    Container(printer, "PDF Printer", "Node.js / Playwright", "Prints HTML to PDF via headless Chromium")
+  }
+
+  System_Ext(chromium, "Headless Chromium", "Browser binary managed by Playwright, cached locally")
+  System_Ext(filesystem, "File System", "Source and output files")
+
+  Rel(author, cli, "proven-docs render <file>", "Shell")
+  Rel(cli, filesystem, "Reads .adoc source")
+  Rel(cli, renderer, "Passes source text")
+  Rel(renderer, cli, "Returns HTML string")
+  Rel(cli, printer, "Passes HTML + output path")
+  Rel(printer, chromium, "Launches, sets content, prints to PDF")
+  Rel(printer, filesystem, "Writes .pdf file")
+----
+
+== Technology Stack
+
+[cols="1,2,1", options="header"]
+|===
+| Technology | Purpose | ADR
+
+| Node.js (ESM)
+| Runtime environment
+| --
+
+| @asciidoctor/core
+| AsciiDoc to HTML rendering
+| <<adrs/0001-asciidoctor-js-for-rendering.adoc#,ADR-0001>>
+
+| Playwright + Chromium
+| Headless browser PDF printing
+| <<adrs/0002-playwright-for-pdf.adoc#,ADR-0002>>
+
+| Commander.js
+| CLI argument parsing and help generation
+| <<adrs/0003-commander-for-cli.adoc#,ADR-0003>>
+
+| Vitest
+| Test framework (dev dependency)
+| --
+|===
+
+== Data Flow
+
+....
+.adoc file (disk)
+  → fs.readFileSync() → AsciiDoc source (string)
+    → @asciidoctor/core convert() → HTML document (string)
+      → Playwright page.setContent() → browser DOM
+        → page.pdf() → PDF bytes
+          → disk write → .pdf file (disk)
+....
+
+All data flows within a single process. No network calls, no persistence beyond the output file.
+
+== Cross-Cutting Concerns
+
+=== Error Handling
+
+All errors are caught at the CLI layer and reported to stderr with descriptive messages. The CLI exits with code 0 on success and code 1 on any failure. Error categories:
+
+* File not found / not readable (input validation)
+* AsciiDoc rendering errors (asciidoctor.js)
+* Browser launch failure (Playwright/Chromium)
+* PDF write failure (file system)
+
+=== Offline Operation
+
+The tool requires no network access during operation. Playwright's Chromium binary is pre-installed and cached locally. AsciiDoc rendering is entirely in-process. This satisfies the project Connectivity constraint.
