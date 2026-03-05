@@ -1,23 +1,25 @@
 = Design: AsciiDoc to PDF
-:version: 1.0.0
+:version: 2.0.1
 :status: Current
-:source-stories-version: 1.0.0
-:source-spec-version: 1.0.0
+:source-stories-version: 1.1.0
+:source-spec-version: 1.1.0
 :last-updated: 2026-03-05
 :feature: adoc-to-pdf
 :toc:
 
 == Technical Context
 
-Proven Docs is a greenfield Node.js ESM CLI tool for converting AsciiDoc documentation to publishable artifacts. This feature implements the core rendering pipeline: AsciiDoc source to HTML (via asciidoctor.js) to PDF (via headless Chromium printing).
+Proven Docs is a Node.js ESM CLI tool for converting AsciiDoc documentation to publishable artifacts. The core rendering pipeline (AsciiDoc → HTML → PDF) is implemented and working (v1.0.0). This design update extends the pipeline with two new capabilities: Mermaid diagram rendering and source code syntax highlighting. Both leverage the existing headless Chromium browser (Playwright) by injecting JavaScript libraries into the HTML page before PDF printing.
 
-The project has no existing code. Dependencies are installed: `@asciidoctor/core`, `playwright`, `commander`.
+Existing dependencies: `@asciidoctor/core`, `playwright`, `commander`. New dependencies for this update: `mermaid`, `highlight.js`.
 
 == Decisions and Constraints
 
 * <<../../adrs/0001-asciidoctor-js-for-rendering.adoc#,ADR-0001>>: Use @asciidoctor/core for AsciiDoc rendering
 * <<../../adrs/0002-playwright-for-pdf.adoc#,ADR-0002>>: Use Playwright with Chromium for headless PDF printing
 * <<../../adrs/0003-commander-for-cli.adoc#,ADR-0003>>: Use Commander.js for CLI framework
+* <<../../adrs/0004-mermaid-for-diagrams.adoc#,ADR-0004>>: Use Mermaid.js for diagram rendering in browser
+* <<../../adrs/0005-highlightjs-for-syntax.adoc#,ADR-0005>>: Use highlight.js for syntax highlighting in browser
 
 Project constraints:
 
@@ -31,22 +33,28 @@ All unknowns have been resolved:
 * **Playwright browser availability**: Playwright ships browser binaries via `npx playwright install`. Once installed, browsers are cached locally and work offline. The `chromium` channel is used (not `chrome` or `msedge`).
 * **`page.pdf()` API**: Playwright's `page.pdf()` produces a PDF from the rendered page using Chromium's print-to-PDF engine. It supports `format` (A4, Letter), `printBackground`, `margin`, and other print options. It requires the browser to be launched in headless mode (the default).
 * **`@asciidoctor/core` output**: The `convert()` method returns an HTML string (document body). For a complete HTML document with `<html>`, `<head>`, `<body>` tags, set the `standalone` option to `true`. A standalone document is required for proper browser rendering with styles.
+* **Mermaid.js browser-side rendering**: The `mermaid` npm package requires a DOM environment. It cannot run in Node.js without a DOM shim. Since we already have headless Chromium, we inject the mermaid library source into the HTML page and let Chromium execute it. The `mermaid.run()` API converts `<pre class="mermaid">` or `<code class="language-mermaid">` elements into inline SVG. The rendering is synchronous from the page perspective — `mermaid.run()` returns a Promise that resolves when all diagrams are rendered.
+* **Highlight.js browser-side execution**: highlight.js auto-detects and highlights `<pre><code class="language-xxx">` blocks. Asciidoctor emits `<pre><code>` with language classes. Injecting highlight.js core + `hljs.highlightAll()` into the page highlights all code blocks before PDF printing.
+* **Mermaid dependency licensing**: The `mermaid` package and all transitive dependencies use permissive licenses (MIT, ISC, Apache-2.0, BSD). Verified via `license-checker`.
+* **Highlight.js licensing**: BSD-3-Clause. Permissive. Satisfies licensing constraint.
 
 == System Design
 
-The feature is a three-stage pipeline with a CLI entry point.
+The feature is a multi-stage pipeline with a CLI entry point. The core pipeline (AsciiDoc → HTML → PDF) is extended with two enrichment stages that operate on the HTML before PDF printing.
 
 [source,mermaid]
 ----
 flowchart LR
     CLI["CLI Entry Point\n(commander)"]
     RENDER["AsciiDoc Renderer\n(@asciidoctor/core)"]
+    ENRICH["HTML Enricher\n(inject mermaid +\nhighlight.js)"]
     PRINT["PDF Printer\n(playwright)"]
     FS["File System"]
 
     CLI -->|"input path,\noptions"| RENDER
     FS -->|".adoc content"| RENDER
-    RENDER -->|"HTML string"| PRINT
+    RENDER -->|"HTML string"| ENRICH
+    ENRICH -->|"enriched HTML"| PRINT
     PRINT -->|".pdf bytes"| FS
 ----
 
@@ -55,8 +63,9 @@ flowchart LR
 ....
 src/
 ├── cli.js            # CLI entry point and command definitions
-├── render.js         # AsciiDoc-to-HTML rendering
-└── print.js          # HTML-to-PDF via headless browser
+├── render.js         # AsciiDoc-to-HTML rendering with font injection
+├── enrich.js         # HTML enrichment: inject mermaid.js + highlight.js
+└── print.js          # HTML-to-PDF via headless browser (executes injected JS)
 bin/
 └── proven-docs.js    # Executable entry point (shebang + import cli)
 ....
@@ -86,7 +95,9 @@ sequenceDiagram
     participant User
     participant CLI as cli.js
     participant Render as render.js
+    participant Enrich as enrich.js
     participant Print as print.js
+    participant Browser as Chromium
     participant FS as File System
 
     User->>CLI: proven-docs render report.adoc
@@ -95,15 +106,41 @@ sequenceDiagram
     CLI->>FS: Read file content
     FS-->>CLI: AsciiDoc source
     CLI->>Render: renderToHtml(source)
-    Render-->>CLI: HTML string
+    Render-->>CLI: HTML string (with fonts)
+    CLI->>Enrich: enrichHtml(html)
+    Note over Enrich: Server-side: hljs.highlight()<br/>Transform mermaid blocks
+    Enrich-->>CLI: Enriched HTML
     CLI->>Print: printToPdf(html, outputPath)
-    Print->>Print: Launch headless Chromium
-    Print->>Print: Set page content (HTML)
-    Print->>Print: page.pdf() → PDF bytes
+    Print->>Browser: Launch headless Chromium
+    Print->>Browser: page.setContent(html)
+    Print->>Browser: addScriptTag(mermaid.min.js)
+    Print->>Browser: page.evaluate(mermaid.render)
+    Note over Browser: Mermaid blocks → SVG
+    Print->>Browser: page.pdf()
+    Browser-->>Print: PDF bytes
     Print->>FS: Write PDF file
+    Print->>Browser: browser.close()
     Print-->>CLI: Success
     CLI->>User: "Created report.pdf"
 ----
+
+=== HTML Enricher (`src/enrich.js`)
+
+Responsibility: Transform Mermaid code blocks and apply server-side syntax highlighting. Exports the mermaid library path for the printer to load via `addScriptTag`.
+
+Exports:
+
+* `enrichHtml(html: string): string` — transforms mermaid blocks into `<pre class="mermaid">`, applies server-side highlight.js, injects highlight.js CSS theme.
+* `mermaidJsPath: string` — absolute path to `mermaid.min.js` for the printer to load in the browser.
+
+Implementation:
+
+1. At module load time, read the highlight.js CSS theme (`github.css`) from `node_modules/highlight.js/styles/` and resolve the path to `mermaid.min.js`.
+2. **Syntax highlighting (server-side)**: Import `highlight.js` as an npm module. For each `<code data-lang="xxx">` block (non-mermaid), call `hljs.highlight(code, { language })` in Node.js. Replace the raw code with pre-highlighted HTML containing hljs span classes. Inject the `github.css` theme into `<head>`.  Unrecognised languages are left as plain text (highlight.js returns the input unchanged).
+3. **Mermaid block transformation**: Transform Asciidoctor's `<pre class="highlight"><code data-lang="mermaid">` elements into `<pre class="mermaid">` elements. The actual mermaid.js rendering happens in `print.js` via `page.addScriptTag` + `page.evaluate` (see below).
+4. **Execution order**: Syntax highlighting runs first (server-side), then mermaid block transformation.
+
+NOTE: The original design specified browser-side injection of both mermaid.js and highlight.js. During implementation, we discovered that (a) inline injection of the 2.8MB mermaid.min.js fails in Chromium due to octal escape sequences in strict mode contexts, and (b) highlight.js works natively in Node.js, making server-side highlighting simpler and more reliable. Mermaid rendering was moved to `print.js` using `page.addScriptTag({ path })` which avoids the inline injection issue.
 
 === AsciiDoc Renderer (`src/render.js`)
 
@@ -124,23 +161,26 @@ The `standalone: true` option produces a full HTML document (`<html>`, `<head>`,
 
 === PDF Printer (`src/print.js`)
 
-Responsibility: Take an HTML string, render it in a headless Chromium browser, and print to PDF.
+Responsibility: Take an enriched HTML string, render it in a headless Chromium browser, execute Mermaid rendering if needed, capture console warnings, and print to PDF.
 
 Exports a single function:
 
-* `printToPdf(html: string, outputPath: string): Promise<void>` — launches a headless browser, loads the HTML, prints to PDF, writes the file, and closes the browser.
+* `printToPdf(html: string, outputPath: string): Promise<void>` — launches a headless browser, loads the HTML, renders Mermaid diagrams, prints to PDF, writes the file, and closes the browser.
 
 Implementation:
 
-1. Import `chromium` from `playwright`
-2. Launch a headless browser: `chromium.launch()`
-3. Create a new page: `browser.newPage()`
-4. Set the page content: `page.setContent(html, { waitUntil: 'load' })` — wait for load event so embedded styles are applied
-5. Print to PDF: `page.pdf({ path: outputPath, format: 'A4', printBackground: true })`
-6. Close the browser: `browser.close()`
-7. Ensure browser cleanup happens even on error (try/finally)
+1. Import `chromium` from `playwright` and `mermaidJsPath` from `enrich.js`
+2. Detect if the HTML contains `class="mermaid"` blocks
+3. Launch a headless browser: `chromium.launch()`
+4. Create a new page: `browser.newPage()`
+5. Register a `console` event listener on the page to capture `console.warn()` messages from Mermaid error handling. Forward these to `process.stderr`.
+6. Set the page content: `page.setContent(html, { waitUntil: 'load' })` — syntax highlighting is already applied server-side by the enricher, so it appears immediately.
+7. **If Mermaid blocks exist**: Load mermaid.js via `page.addScriptTag({ path: mermaidJsPath })` — this loads the library from disk into the browser without inline injection issues. Then call `page.evaluate()` to run `mermaid.initialize()` and render each `<pre class="mermaid">` block individually via `mermaid.render()`. Each block is wrapped in a try/catch: successful blocks get their SVG; failed blocks get a styled error indication and emit `console.warn()`.
+8. Print to PDF: `page.pdf({ path: outputPath, format: 'A4', printBackground: true })`
+9. Close the browser: `browser.close()`
+10. Ensure browser cleanup happens even on error (try/finally)
 
-The `printBackground: true` option is important for AsciiDoc documents that use background colors in admonition blocks, code blocks, and table headers.
+The `printBackground: true` option is important for AsciiDoc documents that use background colors in admonition blocks, code blocks, table headers, and syntax-highlighted code.
 
 === Executable Entry Point (`bin/proven-docs.js`)
 
@@ -230,3 +270,24 @@ Criteria::
 * When the user runs the command with --help → Commander auto-generates help from command definition (PDF-011)
 * The system shall exit with code 0 on successful conversion → CLI handler calls `process.exit(0)` on success path (PDF-012)
 * The system shall exit with a non-zero exit code on failure → CLI error handler calls `process.exit(1)` on all error paths (PDF-013)
+
+=== US-005: Mermaid Diagram Rendering
+
+Components:: HTML Enricher, PDF Printer
+Criteria::
+* When the input AsciiDoc contains a Mermaid source block, the system shall render the Mermaid syntax as a visual diagram → Enricher transforms `[source,mermaid]` blocks into `<pre class="mermaid">` elements, injects mermaid.js; Chromium executes `mermaid.run()` to produce inline SVG (PDF-014)
+* The system shall support flowchart, sequence, class, state, C4Context, C4Container, and C4Component diagram types → Mermaid.js natively supports all listed types; no filtering needed (PDF-015)
+* The rendered diagrams shall be legible at the PDF page scale → Mermaid's default theme and SVG output scale with the page; `mermaid.initialize()` uses default width which fits A4 (PDF-016)
+* The system shall render Mermaid diagrams without requiring a network connection → Mermaid.js source is bundled inline in the HTML; no external requests. Covered by project Connectivity constraint.
+* If a Mermaid block contains invalid syntax → Mermaid error handler replaces the block with a styled error message and emits `console.warn()`, which print.js captures and forwards to stderr (PDF-017)
+* When an AsciiDoc file contains multiple Mermaid blocks → `mermaid.run()` processes all `<pre class="mermaid">` elements independently; each becomes its own SVG (PDF-018)
+
+=== US-006: Source Code Syntax Highlighting
+
+Components:: HTML Enricher, PDF Printer
+Criteria::
+* When the input AsciiDoc contains a source code block with a language attribute → Enricher injects highlight.js core and CSS theme; Chromium executes `hljs.highlightAll()` which highlights all `<pre><code class="language-xxx">` blocks (PDF-019)
+* The system shall support syntax highlighting for JavaScript, TypeScript, Python, Java, Ruby, Go, Rust, HTML, CSS, JSON, YAML, and shell scripts → highlight.js supports 190+ languages including all listed ones. Common languages are bundled in the core (PDF-020)
+* The highlighted code shall use a colour scheme legible when printed on paper → The `github` highlight.js theme uses a light background with sufficient contrast for both screen and print (PDF-021)
+* The system shall apply syntax highlighting without requiring a network connection → highlight.js source and theme CSS are bundled inline in the HTML. Covered by project Connectivity constraint.
+* When a source code block specifies an unrecognised language → highlight.js silently skips unknown languages, leaving the code as plain monospaced text (PDF-022)

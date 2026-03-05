@@ -1,5 +1,5 @@
 = System Architecture
-:version: 1.0.0
+:version: 1.1.0
 :last-updated: 2026-03-05
 :toc:
 
@@ -9,12 +9,12 @@
 |===
 | Feature | Design Version
 
-| adoc-to-pdf | 1.0.0
+| adoc-to-pdf | 2.0.1
 |===
 
 == Overview
 
-Proven Docs is a Node.js CLI tool for converting AsciiDoc documentation to publishable PDF artifacts. It implements a rendering pipeline: AsciiDoc source is converted to HTML, then the HTML is printed to PDF using a headless Chromium browser.
+Proven Docs is a Node.js CLI tool for converting AsciiDoc documentation to publishable PDF artifacts. It implements a rendering pipeline: AsciiDoc source is converted to HTML, enriched with syntax highlighting and Mermaid diagram support, then printed to PDF using a headless Chromium browser.
 
 The tool is designed to work fully offline, integrate into CI pipelines, and produce deterministic output.
 
@@ -37,7 +37,7 @@ C4Context
 
 == Container View (C4 Level 2)
 
-Proven Docs is a single CLI process with three internal modules. The headless Chromium browser is a runtime dependency managed by Playwright.
+Proven Docs is a single CLI process with four internal modules. The headless Chromium browser is a runtime dependency managed by Playwright.
 
 [source,mermaid]
 ----
@@ -48,8 +48,9 @@ C4Container
 
   System_Boundary(provendocs, "Proven Docs") {
     Container(cli, "CLI", "Node.js / Commander.js", "Parses arguments, orchestrates pipeline, handles errors")
-    Container(renderer, "AsciiDoc Renderer", "Node.js / @asciidoctor/core", "Converts AsciiDoc source to standalone HTML")
-    Container(printer, "PDF Printer", "Node.js / Playwright", "Prints HTML to PDF via headless Chromium")
+    Container(renderer, "AsciiDoc Renderer", "Node.js / @asciidoctor/core", "Converts AsciiDoc source to standalone HTML with local fonts")
+    Container(enricher, "HTML Enricher", "Node.js / highlight.js", "Server-side syntax highlighting, Mermaid block transformation")
+    Container(printer, "PDF Printer", "Node.js / Playwright + mermaid", "Loads mermaid.js in browser, renders diagrams to SVG, prints to PDF")
   }
 
   System_Ext(chromium, "Headless Chromium", "Browser binary managed by Playwright, cached locally")
@@ -59,8 +60,10 @@ C4Container
   Rel(cli, filesystem, "Reads .adoc source")
   Rel(cli, renderer, "Passes source text")
   Rel(renderer, cli, "Returns HTML string")
-  Rel(cli, printer, "Passes HTML + output path")
-  Rel(printer, chromium, "Launches, sets content, prints to PDF")
+  Rel(cli, enricher, "Passes HTML")
+  Rel(enricher, cli, "Returns enriched HTML")
+  Rel(cli, printer, "Passes enriched HTML + output path")
+  Rel(printer, chromium, "Loads mermaid.js, renders diagrams, prints to PDF")
   Rel(printer, filesystem, "Writes .pdf file")
 ----
 
@@ -86,6 +89,14 @@ C4Container
 | CLI argument parsing and help generation
 | <<adrs/0003-commander-for-cli.adoc#,ADR-0003>>
 
+| mermaid
+| Mermaid diagram rendering (browser-side via addScriptTag)
+| <<adrs/0004-mermaid-for-diagrams.adoc#,ADR-0004>>
+
+| highlight.js
+| Source code syntax highlighting (server-side in Node.js)
+| <<adrs/0005-highlightjs-for-syntax.adoc#,ADR-0005>>
+
 | Vitest
 | Test framework (dev dependency)
 | --
@@ -96,13 +107,17 @@ C4Container
 ....
 .adoc file (disk)
   → fs.readFileSync() → AsciiDoc source (string)
-    → @asciidoctor/core convert() → HTML document (string)
-      → Playwright page.setContent() → browser DOM
-        → page.pdf() → PDF bytes
-          → disk write → .pdf file (disk)
+    → @asciidoctor/core convert() → HTML document (string, with inline fonts)
+      → enrich.js: highlight.js server-side → highlighted code blocks
+      → enrich.js: transform mermaid blocks → <pre class="mermaid">
+        → Playwright page.setContent() → browser DOM
+          → page.addScriptTag(mermaid.min.js) → mermaid loaded
+            → page.evaluate(mermaid.render) → SVG diagrams
+              → page.pdf() → PDF bytes
+                → disk write → .pdf file (disk)
 ....
 
-All data flows within a single process. No network calls, no persistence beyond the output file.
+All data flows within a single process. No network calls, no persistence beyond the output file. Syntax highlighting happens server-side in Node.js. Mermaid rendering happens browser-side in Chromium (requires DOM).
 
 == Cross-Cutting Concerns
 

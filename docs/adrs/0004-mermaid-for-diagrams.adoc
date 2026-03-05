@@ -1,0 +1,32 @@
+= ADR-0004: Use Mermaid.js for Diagram Rendering
+:status: Accepted
+:date: 2026-03-05
+:deciders: User, AI assistant
+
+== Context
+
+Documentation authors need to include architecture diagrams, flowcharts, sequence diagrams, and other visual diagrams in their AsciiDoc files. These diagrams are authored as Mermaid syntax in `[source,mermaid]` code blocks. The system must render these text-based diagram definitions into visual diagrams within the PDF output. Rendering must work fully offline (project Connectivity constraint) and use only permissive-licensed dependencies (project Licensing constraint).
+
+== Decision
+
+Use the `mermaid` npm package (MIT license) to render Mermaid diagram blocks into inline SVG within the headless Chromium browser that already exists in the pipeline (ADR-0002). The mermaid library JavaScript is bundled at build/module-load time, injected into the HTML page content, and executed by Chromium before PDF printing. This approach reuses the existing Playwright infrastructure without introducing additional browser instances or external processes.
+
+The rendering flow is: AsciiDoc source → HTML with Mermaid code blocks → inject mermaid.js → Chromium executes mermaid.js (code blocks → inline SVG) → print to PDF.
+
+== Consequences
+
+* Mermaid diagrams render as crisp SVG (vector graphics) in the PDF — resolution-independent.
+* The existing Playwright headless Chromium handles all rendering; no additional browser process needed.
+* The `mermaid` npm package adds a significant number of transitive dependencies. All must satisfy the licensing constraint.
+* Mermaid version updates may change diagram rendering output. Pin to a specific version range.
+* Browser-side rendering means the Chromium page must wait for mermaid.js execution to complete before printing. The `print.js` module must coordinate this timing.
+
+== Alternatives Considered
+
+=== @mermaid-js/mermaid-cli
+
+The official Mermaid CLI (`mmdc`) converts Mermaid files to SVG/PNG/PDF. It internally uses Puppeteer with its own headless browser instance. Rejected because it duplicates the browser dependency (we already have Playwright/Chromium), adds significant install size, and introduces a separate process to manage. The licensing is MIT, so it satisfies constraints, but the architectural redundancy makes it a poor fit.
+
+=== Pre-processing with mermaid-js in Node.js (server-side)
+
+Render Mermaid to SVG in Node.js using mermaid's programmatic API before injecting into HTML. Rejected because mermaid.js requires a DOM environment (it manipulates SVG elements). Running it in Node.js would require jsdom or a similar DOM shim, adding complexity without benefit since we already have a real browser available.

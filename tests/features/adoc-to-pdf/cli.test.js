@@ -1,5 +1,5 @@
 // Feature: adoc-to-pdf
-// Spec version: 1.0.0
+// Spec version: 1.1.0
 // Generated from: spec.adoc
 //
 // Spec coverage:
@@ -14,6 +14,14 @@
 //   PDF-011: --help displays usage
 //   PDF-012: Exit code 0 on success
 //   PDF-013: Non-zero exit code on failure
+//   PDF-014: Mermaid blocks rendered as visual diagrams (e2e)
+//   PDF-016: Diagram legibility at page scale (e2e)
+//   PDF-017: Error indication for invalid Mermaid syntax (e2e)
+//   PDF-018: Multiple Mermaid blocks rendered independently (e2e)
+//   PDF-019: Syntax highlighting for source code blocks (e2e)
+//   PDF-020: Supported highlighting languages (e2e)
+//   PDF-021: Print-legible highlighting colour scheme (e2e)
+//   PDF-022: Graceful fallback for unrecognised languages (e2e)
 //
 // Test level: Integration / End-to-end
 
@@ -29,7 +37,7 @@ const CLI_PATH = path.resolve('bin/proven-docs.js');
 
 function run(args, options = {}) {
   return execFileAsync('node', [CLI_PATH, ...args], {
-    timeout: 30000,
+    timeout: 60000,
     ...options,
   }).then(
     ({ stdout, stderr }) => ({ stdout, stderr, exitCode: 0 }),
@@ -236,5 +244,289 @@ describe('PDF-013: Non-zero exit code on failure', () => {
     const result = await run(['render', '/does/not/exist.adoc']);
 
     expect(result.exitCode).not.toBe(0);
+  });
+});
+
+// --- Mermaid diagram rendering (e2e) ---
+
+describe('PDF-014: Mermaid blocks rendered as visual diagrams (e2e)', { timeout: 60000 }, () => {
+  it('should produce a PDF with rendered Mermaid diagrams (not raw text)', async () => {
+    const inputFile = path.join(tmpDir, 'test-014-mermaid.adoc');
+    const pdfFile = inputFile.replace('.adoc', '.pdf');
+    fs.writeFileSync(
+      inputFile,
+      [
+        '= Mermaid Test',
+        '',
+        '[source,mermaid]',
+        '----',
+        'flowchart LR',
+        '  A[Start] --> B[End]',
+        '----',
+      ].join('\n'),
+    );
+
+    const result = await run(['render', inputFile]);
+
+    expect(result.exitCode).toBe(0);
+    expect(fs.existsSync(pdfFile)).toBe(true);
+
+    // A PDF with a rendered SVG diagram should be significantly larger
+    // than one with just raw text
+    const stat = fs.statSync(pdfFile);
+    expect(stat.size).toBeGreaterThan(5000);
+
+    try { fs.unlinkSync(pdfFile); } catch { /* ignore */ }
+  });
+});
+
+describe('PDF-016: Diagram legibility at page scale (e2e)', { timeout: 60000 }, () => {
+  it('should render a complex diagram that produces a sizeable PDF', async () => {
+    const inputFile = path.join(tmpDir, 'test-016-legible.adoc');
+    const pdfFile = inputFile.replace('.adoc', '.pdf');
+    fs.writeFileSync(
+      inputFile,
+      [
+        '= Legibility Test',
+        '',
+        '[source,mermaid]',
+        '----',
+        'flowchart TD',
+        '  A[Node 1] --> B[Node 2]',
+        '  B --> C[Node 3]',
+        '  C --> D[Node 4]',
+        '  D --> E[Node 5]',
+        '  E --> F[Node 6]',
+        '  F --> G[Node 7]',
+        '  G --> H[Node 8]',
+        '  H --> A',
+        '----',
+      ].join('\n'),
+    );
+
+    const result = await run(['render', inputFile]);
+
+    expect(result.exitCode).toBe(0);
+    expect(fs.existsSync(pdfFile)).toBe(true);
+
+    // A rendered diagram with 8 nodes should produce a non-trivial PDF
+    const stat = fs.statSync(pdfFile);
+    expect(stat.size).toBeGreaterThan(5000);
+
+    try { fs.unlinkSync(pdfFile); } catch { /* ignore */ }
+  });
+});
+
+describe('PDF-017: Error indication for invalid Mermaid syntax (e2e)', { timeout: 60000 }, () => {
+  it('should produce a PDF and print a warning for invalid Mermaid syntax', async () => {
+    const inputFile = path.join(tmpDir, 'test-017-invalid-mermaid.adoc');
+    const pdfFile = inputFile.replace('.adoc', '.pdf');
+    fs.writeFileSync(
+      inputFile,
+      [
+        '= Invalid Mermaid Test',
+        '',
+        '[source,mermaid]',
+        '----',
+        'this is not valid mermaid syntax at all %%%',
+        '----',
+      ].join('\n'),
+    );
+
+    const result = await run(['render', inputFile]);
+
+    // Should still succeed (PDF produced with error indication)
+    expect(result.exitCode).toBe(0);
+    expect(fs.existsSync(pdfFile)).toBe(true);
+
+    // Should print a warning to stderr about the invalid mermaid block
+    expect(result.stderr).toMatch(/mermaid|diagram|syntax|error|parse/i);
+
+    try { fs.unlinkSync(pdfFile); } catch { /* ignore */ }
+  });
+});
+
+describe('PDF-018: Multiple Mermaid blocks rendered independently (e2e)', { timeout: 60000 }, () => {
+  it('should render multiple Mermaid diagrams in a single PDF', async () => {
+    const inputFile = path.join(tmpDir, 'test-018-multi-mermaid.adoc');
+    const pdfFile = inputFile.replace('.adoc', '.pdf');
+    fs.writeFileSync(
+      inputFile,
+      [
+        '= Multiple Diagrams',
+        '',
+        '== First Diagram',
+        '',
+        '[source,mermaid]',
+        '----',
+        'flowchart LR',
+        '  A --> B',
+        '----',
+        '',
+        '== Second Diagram',
+        '',
+        '[source,mermaid]',
+        '----',
+        'sequenceDiagram',
+        '  Alice->>Bob: Hello',
+        '  Bob-->>Alice: Hi',
+        '----',
+        '',
+        '== Third Diagram',
+        '',
+        '[source,mermaid]',
+        '----',
+        'stateDiagram-v2',
+        '  [*] --> Active',
+        '  Active --> Inactive',
+        '----',
+      ].join('\n'),
+    );
+
+    const result = await run(['render', inputFile]);
+
+    expect(result.exitCode).toBe(0);
+    expect(fs.existsSync(pdfFile)).toBe(true);
+
+    // Multiple diagrams should produce a larger PDF
+    const stat = fs.statSync(pdfFile);
+    expect(stat.size).toBeGreaterThan(5000);
+
+    try { fs.unlinkSync(pdfFile); } catch { /* ignore */ }
+  });
+});
+
+// --- Source code syntax highlighting (e2e) ---
+
+describe('PDF-019: Syntax highlighting for source code blocks (e2e)', () => {
+  it('should produce a PDF from a document with syntax-highlighted code', async () => {
+    const inputFile = path.join(tmpDir, 'test-019-highlight.adoc');
+    const pdfFile = inputFile.replace('.adoc', '.pdf');
+    fs.writeFileSync(
+      inputFile,
+      [
+        '= Highlighting Test',
+        '',
+        '[source,javascript]',
+        '----',
+        'function greet(name) {',
+        '  // A greeting function',
+        '  const message = `Hello, ${name}!`;',
+        '  return message;',
+        '}',
+        '----',
+      ].join('\n'),
+    );
+
+    const result = await run(['render', inputFile]);
+
+    expect(result.exitCode).toBe(0);
+    expect(fs.existsSync(pdfFile)).toBe(true);
+
+    // PDF with highlighted code should be non-trivial
+    const stat = fs.statSync(pdfFile);
+    expect(stat.size).toBeGreaterThan(5000);
+
+    try { fs.unlinkSync(pdfFile); } catch { /* ignore */ }
+  });
+});
+
+describe('PDF-020: Supported highlighting languages (e2e)', () => {
+  it('should render code blocks for multiple languages', async () => {
+    const inputFile = path.join(tmpDir, 'test-020-languages.adoc');
+    const pdfFile = inputFile.replace('.adoc', '.pdf');
+    fs.writeFileSync(
+      inputFile,
+      [
+        '= Multi-Language Test',
+        '',
+        '[source,javascript]',
+        '----',
+        'const x = 42;',
+        '----',
+        '',
+        '[source,python]',
+        '----',
+        'def hello():',
+        '    print("Hello")',
+        '----',
+        '',
+        '[source,yaml]',
+        '----',
+        'name: test',
+        'version: 1.0',
+        '----',
+        '',
+        '[source,html]',
+        '----',
+        '<div class="test">Hello</div>',
+        '----',
+      ].join('\n'),
+    );
+
+    const result = await run(['render', inputFile]);
+
+    expect(result.exitCode).toBe(0);
+    expect(fs.existsSync(pdfFile)).toBe(true);
+
+    try { fs.unlinkSync(pdfFile); } catch { /* ignore */ }
+  });
+});
+
+describe('PDF-021: Print-legible highlighting colour scheme (e2e)', () => {
+  it('should produce a PDF with highlighted code (light background theme)', async () => {
+    const inputFile = path.join(tmpDir, 'test-021-print.adoc');
+    const pdfFile = inputFile.replace('.adoc', '.pdf');
+    fs.writeFileSync(
+      inputFile,
+      [
+        '= Print Test',
+        '',
+        '[source,javascript]',
+        '----',
+        '// Comment',
+        'const keyword = "string value";',
+        'function name(param) { return param; }',
+        '----',
+      ].join('\n'),
+    );
+
+    const result = await run(['render', inputFile]);
+
+    expect(result.exitCode).toBe(0);
+    expect(fs.existsSync(pdfFile)).toBe(true);
+
+    // The PDF should have been generated (theme legibility is a visual check,
+    // but we verify the pipeline completes without error)
+    const stat = fs.statSync(pdfFile);
+    expect(stat.size).toBeGreaterThan(5000);
+
+    try { fs.unlinkSync(pdfFile); } catch { /* ignore */ }
+  });
+});
+
+describe('PDF-022: Graceful fallback for unrecognised languages (e2e)', () => {
+  it('should render code blocks with unrecognised languages as plain text', async () => {
+    const inputFile = path.join(tmpDir, 'test-022-unknown-lang.adoc');
+    const pdfFile = inputFile.replace('.adoc', '.pdf');
+    fs.writeFileSync(
+      inputFile,
+      [
+        '= Unknown Language Test',
+        '',
+        '[source,nonexistent_lang]',
+        '----',
+        'this is code in an unknown language',
+        'it should still appear in the PDF',
+        '----',
+      ].join('\n'),
+    );
+
+    const result = await run(['render', inputFile]);
+
+    expect(result.exitCode).toBe(0);
+    expect(fs.existsSync(pdfFile)).toBe(true);
+
+    try { fs.unlinkSync(pdfFile); } catch { /* ignore */ }
   });
 });

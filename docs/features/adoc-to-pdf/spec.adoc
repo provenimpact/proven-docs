@@ -1,6 +1,6 @@
 = Specification: AsciiDoc to PDF
-:version: 1.0.0
-:source-stories-version: 1.0.0
+:version: 1.1.0
+:source-stories-version: 1.1.0
 :last-updated: 2026-03-05
 :feature: adoc-to-pdf
 :prefix: PDF
@@ -99,6 +99,69 @@ Verification:: Run the render command with an invalid input (missing file, unrea
 
 NOTE: Offline operation is enforced by the project-wide Connectivity constraint ("The tool must work fully offline. No network requests are required during normal operation.") and is not duplicated here.
 
+== PDF-014
+When the input AsciiDoc contains a Mermaid source block, the system shall render the Mermaid syntax as a visual diagram in the PDF output.
+
+Type:: Event-driven
+Source:: US-005: Criterion 1
+Verification:: Create an .adoc file containing a `[source,mermaid]` block with a valid flowchart definition. Run the render command. Open the resulting PDF and confirm that the Mermaid block is rendered as a visual diagram, not raw text.
+
+== PDF-015
+The system shall support rendering the following Mermaid diagram types: flowchart, sequence, class, state, C4Context, C4Container, and C4Component.
+
+Type:: Ubiquitous
+Source:: US-005: Criterion 2
+Verification:: Create an .adoc file containing one Mermaid block for each supported diagram type. Run the render command. Open the resulting PDF and confirm that each diagram type renders as a recognisable visual diagram.
+
+== PDF-016
+The system shall render Mermaid diagrams at a size that is legible at the PDF page scale without manual zooming.
+
+Type:: Ubiquitous
+Source:: US-005: Criterion 3
+Verification:: Create an .adoc file containing a Mermaid flowchart with at least 8 nodes. Run the render command. Open the PDF at 100% zoom and confirm that all labels and connections are readable.
+
+== PDF-017
+If a Mermaid block contains invalid syntax, then the system shall include an error indication in the PDF output at the location of the diagram and print a warning to stderr.
+
+Type:: Unwanted behavior
+Source:: US-005: Criterion 5
+Verification:: Create an .adoc file containing a Mermaid block with deliberately invalid syntax. Run the render command. Confirm that the PDF contains an error indication where the diagram would appear and that stderr includes a warning message referencing the invalid block.
+
+== PDF-018
+When an AsciiDoc file contains multiple Mermaid blocks, the system shall render each block as a separate diagram.
+
+Type:: Event-driven
+Source:: US-005: Criterion 6
+Verification:: Create an .adoc file containing three distinct Mermaid blocks (e.g., a flowchart, a sequence diagram, and a state diagram). Run the render command. Open the PDF and confirm that all three diagrams are rendered independently in their respective positions.
+
+== PDF-019
+When the input AsciiDoc contains a source code block with a language attribute, the system shall apply syntax highlighting to the code in the PDF output.
+
+Type:: Event-driven
+Source:: US-006: Criterion 1
+Verification:: Create an .adoc file containing a `[source,javascript]` block with a function definition. Run the render command. Open the PDF and confirm that keywords, strings, and comments are rendered in distinct colors.
+
+== PDF-020
+The system shall support syntax highlighting for at minimum the following languages: JavaScript, TypeScript, Python, Java, Ruby, Go, Rust, HTML, CSS, JSON, YAML, and shell scripts.
+
+Type:: Ubiquitous
+Source:: US-006: Criterion 2
+Verification:: Create an .adoc file containing one source block for each listed language with representative code. Run the render command. Open the PDF and confirm that each block has syntax-specific color highlighting.
+
+== PDF-021
+The system shall apply a syntax highlighting color scheme that remains legible when the PDF is printed on paper.
+
+Type:: Ubiquitous
+Source:: US-006: Criterion 3
+Verification:: Run the render command on a file with syntax-highlighted code blocks. Print the PDF on a black-and-white printer. Confirm that highlighted elements remain distinguishable from each other and from the background.
+
+== PDF-022
+If a source code block specifies a language that the system does not recognise, then the system shall render the code block as plain monospaced text without highlighting.
+
+Type:: Unwanted behavior
+Source:: US-006: Criterion 5
+Verification:: Create an .adoc file containing a `[source,nonexistent_lang]` block. Run the render command. Confirm that the code is displayed as plain monospaced text in the PDF without errors and without highlighting.
+
 == Traceability
 
 [cols="1,2,2", options="header"]
@@ -156,4 +219,40 @@ NOTE: Offline operation is enforced by the project-wide Connectivity constraint 
 | PDF-013
 | Non-zero exit code on failure
 | US-004: Criterion 4, US-003: Criteria 1, 2, 4
+
+| PDF-014
+| Mermaid blocks rendered as visual diagrams
+| US-005: Criterion 1
+
+| PDF-015
+| Supported Mermaid diagram types
+| US-005: Criterion 2
+
+| PDF-016
+| Diagram legibility at page scale
+| US-005: Criterion 3
+
+| PDF-017
+| Error indication for invalid Mermaid syntax
+| US-005: Criterion 5
+
+| PDF-018
+| Multiple Mermaid blocks rendered independently
+| US-005: Criterion 6
+
+| PDF-019
+| Syntax highlighting for source code blocks
+| US-006: Criterion 1
+
+| PDF-020
+| Supported highlighting languages
+| US-006: Criterion 2
+
+| PDF-021
+| Print-legible highlighting color scheme
+| US-006: Criterion 3
+
+| PDF-022
+| Graceful fallback for unrecognised languages
+| US-006: Criterion 5
 |===
