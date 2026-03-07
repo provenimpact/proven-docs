@@ -1,0 +1,102 @@
+= Implementation Tasks: CLI Verbs and Subcommand Structure
+:version: 1.0.0
+:status: Implemented
+:source-design-version: 1.0.0
+:source-stories-version: 1.0.0
+:source-spec-version: 1.0.0
+:last-updated: 2026-03-06
+:feature: cli-verbs
+:toc:
+
+== Overview
+
+Restructure the CLI from a monolithic `src/cli.js` into a modular `src/commands/` layout and add three new subcommands: watch, validate, and info. 3 phases, 8 tasks.
+
+== Phase 1: CLI Restructuring and Global Options
+
+Extract the existing render command into a module and set up the global option framework.
+
+* [x] TASK-001: Restructure cli.js and extract render command [sequential]
++
+Components:: `src/cli.js`, `src/commands/render.js`
+Stories:: US-004
+Specs:: CLI-021, CLI-022, CLI-023, CLI-024, CLI-025, CLI-026, CLI-027, CLI-028
+Description:: Restructure `src/cli.js` to read version from `package.json`, add `--verbose` and `--quiet` global options, add a pre-action hook rejecting both flags together. Extract the render action into `src/commands/render.js` as an exported registration function. Add `--verbose`/`--quiet` awareness to the render command (verbose prints diagnostics to stderr, quiet suppresses success message). Ensure existing render tests still pass.
+
+* [x] TASK-002: Add info subcommand [parallel]
++
+Components:: `src/commands/info.js`
+Stories:: US-003
+Specs:: CLI-015, CLI-016, CLI-017, CLI-018, CLI-019, CLI-020
+Description:: Create `src/commands/info.js` that registers the `info` subcommand. Parse the input file with `asciidoctor.load()`, extract title, author, revnumber, revdate from the document API, extract user-defined attributes via `doc.getAttributes()`, filter out Asciidoctor internal attributes using a known-internals list. Print standard attributes first, then a separator, then user-defined attributes. Omit unset standard attributes. Handle file-not-found with non-zero exit code. No browser launch.
+
+== Phase 2: Validate and Watch Commands
+
+Implement the two remaining subcommands. These are independent of each other.
+
+* [x] TASK-003: Add validate subcommand — AsciiDoc parsing [parallel]
++
+Components:: `src/commands/validate.js`
+Stories:: US-002
+Specs:: CLI-008, CLI-009, CLI-010, CLI-013, CLI-014
+Description:: Create `src/commands/validate.js` that registers the `validate` subcommand. Check file existence, parse with `asciidoctor.load()` using a `MemoryLogger` to capture parse errors and warnings. Print errors/warnings with descriptions. Exit 0 on no errors, exit 1 on errors. No browser launch.
+
+* [x] TASK-004: Add Mermaid syntax validation to validate command [sequential after TASK-003]
++
+Components:: `src/commands/validate.js`
+Stories:: US-002
+Specs:: CLI-011
+Description:: Extend the validate command to find all `[source,mermaid]` blocks in the parsed document. For each, call `mermaid.parse()` (after `mermaid.initialize()`). Report syntax errors with block location. Mermaid errors count as errors (not warnings) for exit code purposes.
+
+* [x] TASK-005: Add source language validation to validate command [sequential after TASK-003]
++
+Components:: `src/commands/validate.js`
+Stories:: US-002
+Specs:: CLI-012
+Description:: Extend the validate command to find all `[source,<lang>]` blocks (non-mermaid) in the parsed document. For each, check `hljs.getLanguage(lang)`. Report unrecognized languages as warnings. Warnings alone do not cause non-zero exit.
+
+* [x] TASK-006: Install chokidar and add watch subcommand [parallel]
++
+Components:: `src/commands/watch.js`
+Stories:: US-001
+Specs:: CLI-001, CLI-002, CLI-003, CLI-004, CLI-005, CLI-006, CLI-007
+Description:: Install chokidar as a production dependency. Create `src/commands/watch.js` that registers the `watch` subcommand. Accept `<file|dir>` argument and `--output` flag. On startup, perform initial render. Create a chokidar watcher with 300ms debounce. On `change` events for `.adoc` files, re-render and print path to stdout. Catch render errors and print to stderr without exiting. Handle SIGINT for clean shutdown.
+
+== Phase 3: Integration Verification
+
+* [x] TASK-007: Verbose and quiet integration across all commands [parallel]
++
+Components:: `src/commands/render.js`, `src/commands/watch.js`, `src/commands/validate.js`, `src/commands/info.js`
+Stories:: US-004
+Specs:: CLI-025, CLI-026, CLI-027
+Description:: Review all four commands for consistent --verbose/--quiet behavior. Verbose: add diagnostic stderr output to watch (file change events, debounce info), validate (block counts, parse timing), and info (attribute count). Quiet: suppress non-error stdout in watch (re-render messages), validate (header line), and info (not applicable — info output is the primary purpose, quiet has no effect).
+
+* [x] TASK-008: End-to-end smoke test of all subcommands [sequential]
++
+Components:: all
+Stories:: US-001, US-002, US-003, US-004
+Specs:: CLI-021, CLI-022, CLI-023, CLI-024
+Description:: Verify all four subcommands are accessible via `proven-docs --help`, each subcommand responds to `--help`, `proven-docs --version` prints the package version. Run a quick end-to-end test: render a sample file, watch it (with a timed kill), validate a file with errors, and run info on a file with metadata.
+
+== Traceability
+
+[cols="1,1,1", options="header"]
+|===
+| Story | Spec IDs | Tasks
+
+| US-001: Watch for Changes and Re-render
+| CLI-001, CLI-002, CLI-003, CLI-004, CLI-005, CLI-006, CLI-007
+| TASK-006, TASK-007, TASK-008
+
+| US-002: Validate AsciiDoc Without Rendering
+| CLI-008, CLI-009, CLI-010, CLI-011, CLI-012, CLI-013, CLI-014
+| TASK-003, TASK-004, TASK-005, TASK-007, TASK-008
+
+| US-003: Show Document Metadata
+| CLI-015, CLI-016, CLI-017, CLI-018, CLI-019, CLI-020
+| TASK-002, TASK-007, TASK-008
+
+| US-004: Modular Command Structure
+| CLI-021, CLI-022, CLI-023, CLI-024, CLI-025, CLI-026, CLI-027, CLI-028
+| TASK-001, TASK-007, TASK-008
+|===

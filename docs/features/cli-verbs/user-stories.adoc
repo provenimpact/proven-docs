@@ -1,0 +1,65 @@
+= User Stories: CLI Verbs and Subcommand Structure
+:version: 1.0.0
+:last-updated: 2026-03-06
+:feature: cli-verbs
+:toc:
+
+== US-001: Watch for Changes and Re-render
+As a documentation author,
+I want the CLI to watch my AsciiDoc files and automatically re-render the PDF when I save changes,
+so that I can preview my work continuously without manually running the render command each time.
+
+Acceptance Criteria:
+
+* [ ] When the user runs `proven-docs watch <file>`, the system shall render the file to PDF immediately and then monitor it for changes.
+* [ ] When the watched file is modified, the system shall re-render the PDF automatically.
+* [ ] The system shall print a message to stdout each time a re-render completes, including the output path.
+* [ ] When the user runs `proven-docs watch <directory>`, the system shall monitor all .adoc files in that directory for changes and re-render any file that is modified.
+* [ ] The system shall continue watching until the user terminates the process (e.g., Ctrl+C).
+* [ ] If a re-render fails, then the system shall print the error to stderr and continue watching for further changes rather than exiting.
+* [ ] The watch command shall accept the same `--output` flag as the render command to control the PDF output location.
+
+== US-002: Validate AsciiDoc Without Rendering
+As a documentation author,
+I want to check my AsciiDoc files for errors without producing a PDF,
+so that I can catch problems quickly in my editor workflow or CI pipeline without the overhead of browser-based PDF generation.
+
+Acceptance Criteria:
+
+* [ ] When the user runs `proven-docs validate <file>`, the system shall parse the AsciiDoc file and report any errors or warnings without producing a PDF.
+* [ ] The system shall exit with code 0 when validation passes with no errors.
+* [ ] If the AsciiDoc file contains errors, then the system shall exit with a non-zero exit code and print each error with a description.
+* [ ] The system shall validate that Mermaid source blocks contain syntactically valid Mermaid markup.
+* [ ] The system shall validate that source code blocks specify a recognized language attribute.
+* [ ] If the specified file does not exist, then the system shall exit with a non-zero exit code and print an error message identifying the missing file.
+* [ ] The validate command shall complete without launching a headless browser.
+
+== US-003: Show Document Metadata
+As a documentation author,
+I want to inspect the metadata of an AsciiDoc file from the command line,
+so that I can verify the title, author, revision, and other attributes are correct before rendering.
+
+Acceptance Criteria:
+
+* [ ] When the user runs `proven-docs info <file>`, the system shall parse the AsciiDoc file and print its document attributes to stdout.
+* [ ] The system shall display at minimum: document title, author, revision number, and revision date when present in the document header.
+* [ ] The system shall display all user-defined document attributes (e.g., `:classification:`, `:department:`).
+* [ ] If a standard attribute is not set in the document, then the system shall omit it from the output rather than displaying an empty value.
+* [ ] If the specified file does not exist, then the system shall exit with a non-zero exit code and print an error message identifying the missing file.
+* [ ] The info command shall complete without launching a headless browser.
+
+== US-004: Modular Command Structure
+As a documentation author,
+I want each CLI verb to behave consistently with standard conventions,
+so that the tool feels predictable and I can discover commands and options easily.
+
+Acceptance Criteria:
+
+* [ ] The system shall provide `render`, `watch`, `validate`, and `info` as top-level subcommands.
+* [ ] When the user runs `proven-docs --version`, the system shall display the current version number.
+* [ ] When the user runs `proven-docs --help`, the system shall list all available subcommands with descriptions.
+* [ ] When the user runs any subcommand with `--help`, the system shall display usage information specific to that subcommand.
+* [ ] The system shall support `--verbose` and `--quiet` flags on all subcommands that produce output.
+* [ ] While the `--verbose` flag is active, the system shall print additional diagnostic information to stderr.
+* [ ] While the `--quiet` flag is active, the system shall suppress all non-error output.
+* [ ] If the user provides both `--verbose` and `--quiet`, then the system shall print an error and exit with a non-zero exit code.

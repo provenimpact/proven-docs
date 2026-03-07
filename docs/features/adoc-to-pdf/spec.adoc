@@ -177,10 +177,24 @@ Source:: US-007: Criterion 2
 Verification:: Place `index.adoc` (with an include directive) and its included file in `project/docs/`. Run `proven-docs render project/docs/index.adoc` from the project root. Confirm the PDF is produced with the included content present.
 
 == PDF-025
+When the user invokes the validate command from a working directory different from the input file's directory, the system shall resolve include directives relative to the input file's directory.
+
+Type:: Event-driven
+Source:: US-007: Criterion 3
+Verification:: Place an .adoc file with an include directive and its included file in a subdirectory. Run `proven-docs validate <subdirectory>/file.adoc` from the parent directory. Confirm no false errors are reported for the include.
+
+== PDF-026
+When the user invokes the info command from a working directory different from the input file's directory, the system shall resolve include directives relative to the input file's directory.
+
+Type:: Event-driven
+Source:: US-007: Criterion 4
+Verification:: Place an .adoc file with an include directive and its included file in a subdirectory. Run `proven-docs info <subdirectory>/file.adoc` from the parent directory. Confirm document metadata is extracted without include-related errors.
+
+== PDF-027
 If an included file does not exist at the resolved path, then the system shall report an error identifying the missing file.
 
 Type:: Unwanted behavior
-Source:: US-007: Criterion 3
+Source:: US-007: Criterion 5
 Verification:: Create an .adoc file with an `include::` directive pointing to a non-existent file. Run the render command. Confirm that an error or warning is reported that identifies the missing file path.
 
 == Traceability
@@ -286,6 +300,14 @@ Verification:: Create an .adoc file with an `include::` directive pointing to a 
 | US-007: Criterion 2
 
 | PDF-025
-| Error on missing included file
+| Validate resolves includes from input file directory
 | US-007: Criterion 3
+
+| PDF-026
+| Info resolves includes from input file directory
+| US-007: Criterion 4
+
+| PDF-027
+| Error on missing included file
+| US-007: Criterion 5
 |===

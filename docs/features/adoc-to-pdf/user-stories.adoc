@@ -87,4 +87,6 @@ Acceptance Criteria:
 
 * [ ] When the input AsciiDoc contains an `include::` directive with a relative path, the system shall resolve that path relative to the directory containing the input file, not the current working directory.
 * [ ] When the user runs the render command from a directory different from the input file's directory, the system shall still resolve includes correctly.
+* [ ] When the user runs the validate command from a directory different from the input file's directory, the system shall still resolve includes correctly.
+* [ ] When the user runs the info command from a directory different from the input file's directory, the system shall still resolve includes correctly.
 * [ ] If an included file does not exist at the resolved path, then the system shall report an error identifying the missing file.

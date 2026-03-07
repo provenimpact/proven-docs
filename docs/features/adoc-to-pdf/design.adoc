@@ -162,7 +162,13 @@ The `standalone: true` option produces a full HTML document (`<html>`, `<head>`,
 
 ==== Include Resolution Strategy
 
-The CLI derives the base directory from the input file path: `path.dirname(absoluteInputPath)`. This ensures `include::` directives always resolve relative to the document's own directory, regardless of where the CLI is invoked from.
+Every command that processes an AsciiDoc file (render, validate, info) must:
+
+1. Resolve the input file path to an absolute path
+2. Derive the base directory from the input file: `path.dirname(absoluteInputPath)`
+3. Pass the base directory to the Asciidoctor call (`base_dir` option for `convert()` / `load()`)
+
+This ensures `include::` directives always resolve relative to the document's own directory, regardless of where the CLI is invoked from. Callers that do not use Asciidoctor through `renderToHtml()` (e.g., `validate` and `info` commands which call `asciidoctor.load()` directly) must pass `base_dir` in their own options object.
 
 === PDF Printer (`src/print.js`)
 
@@ -299,8 +305,10 @@ Criteria::
 
 === US-007: Include Directive Resolution
 
-Components:: CLI Entry Point (`src/cli.js`), AsciiDoc Renderer (`src/render.js`)
+Components:: CLI Entry Point (`src/commands/render.js`, `src/commands/validate.js`, `src/commands/info.js`), AsciiDoc Renderer (`src/render.js`)
 Criteria::
-* When the input AsciiDoc contains an `include::` directive with a relative path, the system shall resolve that path relative to the directory containing the input file → CLI derives `baseDir` from `path.dirname(inputPath)` and passes it to `renderToHtml(source, baseDir)`, which sets `base_dir` in the Asciidoctor options (PDF-023)
-* When the user runs the render command from a different directory → `src/cli.js` passes `path.dirname(inputPath)` to `renderToHtml(source, baseDir)` (PDF-024)
-* If an included file does not exist at the resolved path → Asciidoctor reports the missing include via its logger (PDF-025)
+* When the input AsciiDoc contains an `include::` directive with a relative path, the system shall resolve that path relative to the directory containing the input file → Each command derives `baseDir` from `path.dirname(inputPath)` and passes it to the Asciidoctor call as `base_dir` (PDF-023)
+* When the user runs the render command from a different directory → `src/commands/render.js` passes `path.dirname(inputPath)` to `renderToHtml(source, baseDir)`, which sets `base_dir` in the Asciidoctor options (PDF-024)
+* When the user runs the validate command from a different directory → `src/commands/validate.js` passes `base_dir: path.dirname(filePath)` to `asciidoctor.load()` (PDF-025)
+* When the user runs the info command from a different directory → `src/commands/info.js` passes `base_dir: path.dirname(filePath)` to `asciidoctor.load()` (PDF-026)
+* If an included file does not exist at the resolved path → Asciidoctor reports the missing include via its logger; validate reports it as an error, render produces a warning in stderr (PDF-027)

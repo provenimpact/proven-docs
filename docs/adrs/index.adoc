@@ -1,6 +1,6 @@
 = Architecture Decision Records
-:version: 1.1.0
-:last-updated: 2026-03-05
+:version: 1.2.0
+:last-updated: 2026-03-06
 :toc:
 
 [cols="1,3,1,1", options="header"]
@@ -31,4 +31,9 @@
 | Use highlight.js for syntax highlighting in browser
 | Accepted
 | 2026-03-05
+
+| <<0006-chokidar-for-file-watching.adoc#,ADR-0006>>
+| Use Chokidar for file watching
+| Accepted
+| 2026-03-06
 |===

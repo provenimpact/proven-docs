@@ -5,7 +5,9 @@
 // Spec coverage:
 //   PDF-023: Include directives resolve relative to input file
 //   PDF-024: Render resolves includes from input file directory
-//   PDF-025: Error on missing included file
+//   PDF-025: Validate resolves includes from input file directory
+//   PDF-026: Info resolves includes from input file directory
+//   PDF-027: Error on missing included file
 //
 // Test level: Integration
 
@@ -131,8 +133,66 @@ describe('PDF-024: Render resolves includes from input file directory', () => {
   });
 });
 
-describe('PDF-025: Error on missing included file', () => {
-  it('should report a warning or error when an included file does not exist', async () => {
+describe('PDF-025: Validate resolves includes from input file directory', () => {
+  it('should validate successfully when CWD differs from input file directory', async () => {
+    const inputFile = path.join(tmpDir, 'project', 'docs', 'index.adoc');
+
+    // Run validate from tmpDir (NOT from the docs directory)
+    const result = await run(['validate', inputFile], {
+      cwd: tmpDir,
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    // Should report 0 errors (include resolved correctly)
+    expect(result.stdout).toMatch(/0 error/);
+  });
+
+  it('should validate without false include errors when CWD is completely different', async () => {
+    const inputFile = path.join(tmpDir, 'project', 'docs', 'index.adoc');
+
+    // Run from OS temp root
+    const result = await run(['validate', inputFile], {
+      cwd: os.tmpdir(),
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toMatch(/0 error/);
+  });
+});
+
+describe('PDF-026: Info resolves includes from input file directory', () => {
+  it('should extract metadata without include errors when CWD differs from input file directory', async () => {
+    const inputFile = path.join(tmpDir, 'project', 'docs', 'index.adoc');
+
+    // Run info from tmpDir (NOT from the docs directory)
+    const result = await run(['info', inputFile], {
+      cwd: tmpDir,
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    // Should show the document title
+    expect(result.stdout).toMatch(/Main Document/);
+    // Should show the author
+    expect(result.stdout).toMatch(/Test Author/);
+  });
+
+  it('should extract metadata when CWD is completely different from document directory', async () => {
+    const inputFile = path.join(tmpDir, 'project', 'docs', 'index.adoc');
+
+    // Run from OS temp root
+    const result = await run(['info', inputFile], {
+      cwd: os.tmpdir(),
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toMatch(/Main Document/);
+  });
+});
+
+describe('PDF-027: Error on missing included file', () => {
+  it('should report a warning or error when an included file does not exist (render)', async () => {
     const inputFile = path.join(tmpDir, 'project', 'docs', 'missing.adoc');
 
     const result = await run(['render', inputFile], {
@@ -140,12 +200,23 @@ describe('PDF-025: Error on missing included file', () => {
     });
 
     // Asciidoctor should still produce output but report the missing include
-    // Check stderr for the missing file indication
     const combined = result.stdout + result.stderr;
     expect(combined).toMatch(/include|not found|nonexistent/i);
 
     // Clean up
     const pdfFile = inputFile.replace('.adoc', '.pdf');
     try { fs.unlinkSync(pdfFile); } catch { /* ignore */ }
+  });
+
+  it('should report a warning or error when an included file does not exist (validate)', async () => {
+    const inputFile = path.join(tmpDir, 'project', 'docs', 'missing.adoc');
+
+    const result = await run(['validate', inputFile], {
+      cwd: tmpDir,
+    });
+
+    // Validate should report the missing include as an error or warning
+    const combined = result.stdout + result.stderr;
+    expect(combined).toMatch(/include|not found|nonexistent/i);
   });
 });
