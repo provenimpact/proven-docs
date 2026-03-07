@@ -1,6 +1,6 @@
 = User Stories: AsciiDoc to PDF
-:version: 1.1.0
-:last-updated: 2026-03-05
+:version: 1.2.0
+:last-updated: 2026-03-07
 :feature: adoc-to-pdf
 :toc:
 
@@ -77,3 +77,14 @@ Acceptance Criteria:
 * [ ] The highlighted code shall use a color scheme that is legible when printed on paper.
 * [ ] The system shall apply syntax highlighting without requiring a network connection.
 * [ ] When a source code block specifies an unrecognized language, the system shall render the code block without highlighting rather than failing.
+
+== US-007: Include Directive Resolution
+As a documentation author,
+I want AsciiDoc include directives in my documents to resolve relative to the document's own directory,
+so that I can run the tool from any working directory and my multi-file documents render correctly.
+
+Acceptance Criteria:
+
+* [ ] When the input AsciiDoc contains an `include::` directive with a relative path, the system shall resolve that path relative to the directory containing the input file, not the current working directory.
+* [ ] When the user runs the render command from a directory different from the input file's directory, the system shall still resolve includes correctly.
+* [ ] If an included file does not exist at the resolved path, then the system shall report an error identifying the missing file.

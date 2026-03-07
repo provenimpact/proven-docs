@@ -1,5 +1,18 @@
 = State Transition Log
-:last-updated: 2026-03-05
+:last-updated: 2026-03-07
+
+== TRANSITION-003
+:date: 2026-03-07
+:intent: AsciiDoc include directives resolve relative to the document's directory, not CWD
+:type: Feature evolution
+:risk: Medium
+:features: adoc-to-pdf (extended)
+:desired-state: When rendering an AsciiDoc file from any working directory, include:: directives resolve relative to the document's own directory
+:prior-state: adoc-to-pdf implemented (v1.1.0) -- render command reads source as string and passes to Asciidoctor without base_dir, so includes resolve relative to CWD
+:capabilities-invoked: needs-stories, needs-spec, needs-design, needs-tasks, needs-tests, needs-implementation
+:constraints-checked: Licensing (pass -- no new dependencies), Connectivity (pass -- base_dir is a local path option, no network requests)
+:result: Achieved
+:artifacts-modified: docs/features/adoc-to-pdf/user-stories.adoc (v1.2.0), docs/features/adoc-to-pdf/spec.adoc (v1.2.0), docs/features/adoc-to-pdf/design.adoc (v2.1.0), docs/features/adoc-to-pdf/tasks.adoc (v3.0.0), src/render.js (updated), src/cli.js (updated), tests/features/adoc-to-pdf/render.test.js (updated), tests/features/adoc-to-pdf/include-resolution.test.js (new)
 
 == TRANSITION-002
 :date: 2026-03-05

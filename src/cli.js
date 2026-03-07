@@ -37,9 +37,10 @@ program
       const source = fs.readFileSync(inputPath, 'utf-8');
 
       // Render AsciiDoc to HTML
+      const baseDir = path.dirname(inputPath);
       let html;
       try {
-        html = renderToHtml(source);
+        html = renderToHtml(source, baseDir);
       } catch (err) {
         process.stderr.write(`Error: AsciiDoc rendering failed: ${err.message}\n`);
         process.exit(1);

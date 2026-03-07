@@ -1,10 +1,10 @@
 = Implementation Tasks: AsciiDoc to PDF
-:version: 2.0.0
+:version: 3.0.0
 :status: Implemented
-:source-design-version: 2.0.0
-:source-stories-version: 1.1.0
-:source-spec-version: 1.1.0
-:last-updated: 2026-03-05
+:source-design-version: 2.1.0
+:source-stories-version: 1.2.0
+:source-spec-version: 1.2.0
+:last-updated: 2026-03-07
 :feature: adoc-to-pdf
 :toc:
 
@@ -66,6 +66,24 @@ Stories:: US-005, US-006
 Specs:: PDF-014, PDF-015, PDF-016, PDF-017, PDF-018, PDF-019, PDF-020, PDF-021, PDF-022
 Description:: Create test AsciiDoc files with Mermaid blocks (flowchart, sequence, C4Context) and source code blocks (JavaScript, Python, YAML). Run the CLI and inspect the output PDFs. Confirm diagrams are rendered as visuals (not raw text), code has syntax colours, invalid Mermaid produces error indication + stderr warning, unrecognised languages render as plain monospaced text.
 
+== Phase 4: Include Resolution
+
+Add `base_dir` to Asciidoctor calls so includes resolve relative to the input file's directory.
+
+* [x] TASK-014: Update renderToHtml to accept and pass base_dir [parallel]
++
+Components:: src/render.js
+Stories:: US-007
+Specs:: PDF-023, PDF-024
+Description:: Change `renderToHtml(source)` signature to `renderToHtml(source, baseDir)`. When `baseDir` is provided, add `base_dir: baseDir` to the Asciidoctor `convert()` options object.
+
+* [x] TASK-015: Pass base_dir from render command [parallel]
++
+Components:: src/cli.js
+Stories:: US-007
+Specs:: PDF-023, PDF-024
+Description:: In the render command handler, after resolving `inputPath`, derive `baseDir` as `path.dirname(inputPath)`. Pass `baseDir` as the second argument to `renderToHtml(source, baseDir)`.
+
 == Traceability
 
 [cols="1,1,1", options="header"]
@@ -79,4 +97,8 @@ Description:: Create test AsciiDoc files with Mermaid blocks (flowchart, sequenc
 | US-006: Source Code Syntax Highlighting
 | PDF-019, PDF-020, PDF-021, PDF-022
 | TASK-008, TASK-009, TASK-010, TASK-013
+
+| US-007: Include Directive Resolution
+| PDF-023, PDF-024, PDF-025
+| TASK-014, TASK-015
 |===

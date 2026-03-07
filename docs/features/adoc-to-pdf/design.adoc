@@ -1,9 +1,9 @@
 = Design: AsciiDoc to PDF
-:version: 2.0.1
+:version: 2.1.0
 :status: Current
-:source-stories-version: 1.1.0
-:source-spec-version: 1.1.0
-:last-updated: 2026-03-05
+:source-stories-version: 1.2.0
+:source-spec-version: 1.2.0
+:last-updated: 2026-03-07
 :feature: adoc-to-pdf
 :toc:
 
@@ -144,20 +144,25 @@ NOTE: The original design specified browser-side injection of both mermaid.js an
 
 === AsciiDoc Renderer (`src/render.js`)
 
-Responsibility: Convert AsciiDoc source text to a complete HTML document.
+Responsibility: Convert AsciiDoc source text to a complete HTML document with correct include resolution.
 
 Exports a single function:
 
-* `renderToHtml(source: string): string` — takes raw AsciiDoc text, returns a standalone HTML document string.
+* `renderToHtml(source: string, baseDir?: string): string` — takes raw AsciiDoc text and an optional base directory for include resolution, returns a standalone HTML document string.
 
 Implementation:
 
 1. Import `Asciidoctor` from `@asciidoctor/core`
 2. Create a processor instance
-3. Call `processor.convert(source, { standalone: true, safe: 'safe' })`
-4. Return the HTML string
+3. Build options object: `{ standalone: true, safe: 'safe' }`. When `baseDir` is provided, add `base_dir: baseDir` to the options.
+4. Call `processor.convert(source, options)`
+5. Return the HTML string
 
-The `standalone: true` option produces a full HTML document (`<html>`, `<head>`, `<body>`) with the default Asciidoctor stylesheet embedded. The `safe: 'safe'` mode prevents the document from including external files or running scripts (appropriate for a rendering pipeline).
+The `standalone: true` option produces a full HTML document (`<html>`, `<head>`, `<body>`) with the default Asciidoctor stylesheet embedded. The `safe: 'safe'` mode restricts file access to `base_dir` and its subdirectories, which is appropriate for a rendering pipeline. The `base_dir` option tells Asciidoctor where to resolve `include::` directives from — when omitted, Asciidoctor defaults to the process working directory, which produces incorrect results when the CLI is invoked from a directory different from the document's directory.
+
+==== Include Resolution Strategy
+
+The CLI derives the base directory from the input file path: `path.dirname(absoluteInputPath)`. This ensures `include::` directives always resolve relative to the document's own directory, regardless of where the CLI is invoked from.
 
 === PDF Printer (`src/print.js`)
 
@@ -291,3 +296,11 @@ Criteria::
 * The highlighted code shall use a colour scheme legible when printed on paper → The `github` highlight.js theme uses a light background with sufficient contrast for both screen and print (PDF-021)
 * The system shall apply syntax highlighting without requiring a network connection → highlight.js source and theme CSS are bundled inline in the HTML. Covered by project Connectivity constraint.
 * When a source code block specifies an unrecognised language → highlight.js silently skips unknown languages, leaving the code as plain monospaced text (PDF-022)
+
+=== US-007: Include Directive Resolution
+
+Components:: CLI Entry Point (`src/cli.js`), AsciiDoc Renderer (`src/render.js`)
+Criteria::
+* When the input AsciiDoc contains an `include::` directive with a relative path, the system shall resolve that path relative to the directory containing the input file → CLI derives `baseDir` from `path.dirname(inputPath)` and passes it to `renderToHtml(source, baseDir)`, which sets `base_dir` in the Asciidoctor options (PDF-023)
+* When the user runs the render command from a different directory → `src/cli.js` passes `path.dirname(inputPath)` to `renderToHtml(source, baseDir)` (PDF-024)
+* If an included file does not exist at the resolved path → Asciidoctor reports the missing include via its logger (PDF-025)

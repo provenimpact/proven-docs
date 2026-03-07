@@ -62,13 +62,20 @@ const fontFaceCss = buildFontFaceCss();
  * so the HTML is fully self-contained and renders identically offline.
  *
  * @param {string} source - Raw AsciiDoc text
+ * @param {string} [baseDir] - Base directory for resolving include directives.
+ *   When provided, include:: paths are resolved relative to this directory.
+ *   When omitted, Asciidoctor defaults to the process working directory.
  * @returns {string} Complete HTML document string
  */
-export function renderToHtml(source) {
-  let html = asciidoctor.convert(source, {
+export function renderToHtml(source, baseDir) {
+  const options = {
     standalone: true,
     safe: 'safe',
-  });
+  };
+  if (baseDir) {
+    options.base_dir = baseDir;
+  }
+  let html = asciidoctor.convert(source, options);
 
   // Replace external Google Fonts link with inline font-face declarations
   html = html.replace(
