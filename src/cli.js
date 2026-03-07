@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import fs from 'node:fs';
 import path from 'node:path';
 import { renderToHtml } from './render.js';
+import { enrichHtml } from './enrich.js';
 import { printToPdf } from './print.js';
 
 const program = new Command();
@@ -43,6 +44,9 @@ program
         process.stderr.write(`Error: AsciiDoc rendering failed: ${err.message}\n`);
         process.exit(1);
       }
+
+      // Enrich HTML with mermaid diagrams and syntax highlighting
+      html = enrichHtml(html);
 
       // Resolve output path
       const outputPath = options.output

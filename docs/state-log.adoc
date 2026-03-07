@@ -1,6 +1,19 @@
 = State Transition Log
 :last-updated: 2026-03-05
 
+== TRANSITION-002
+:date: 2026-03-05
+:intent: Mermaid diagram rendering and source code syntax highlighting in PDF output
+:type: Feature evolution
+:risk: High
+:features: adoc-to-pdf (extended)
+:desired-state: AsciiDoc files containing Mermaid diagram blocks render as inline SVG images in PDF output; source code blocks render with syntax highlighting in PDF output
+:prior-state: adoc-to-pdf implemented (v1.0.0) -- renders plain AsciiDoc to PDF but Mermaid blocks render as raw text and code blocks have no highlighting
+:capabilities-invoked: needs-stories, needs-spec, needs-design, needs-adr, needs-tasks, needs-tests, needs-implementation, needs-architecture
+:constraints-checked: Licensing (pass -- mermaid MIT, highlight.js BSD-3-Clause, all 184 deps permissive), Connectivity (pass -- mermaid.js loaded from disk, highlight.js runs in Node.js, no network requests)
+:result: Achieved
+:artifacts-modified: docs/features/adoc-to-pdf/user-stories.adoc (v1.1.0), docs/features/adoc-to-pdf/spec.adoc (v1.1.0), docs/features/adoc-to-pdf/design.adoc (v2.0.1), docs/features/adoc-to-pdf/tasks.adoc (v2.0.0), docs/adrs/0004-mermaid-for-diagrams.adoc, docs/adrs/0005-highlightjs-for-syntax.adoc, docs/adrs/index.adoc (v1.1.0), docs/architecture.adoc (v1.1.0), src/enrich.js (new), src/print.js (updated), src/cli.js (updated), package.json, tests/features/adoc-to-pdf/enrich.test.js (new), tests/features/adoc-to-pdf/cli.test.js (updated), README.md
+
 == TRANSITION-001
 :date: 2026-03-05
 :intent: CLI command converts AsciiDoc files to PDF via headless browser printing

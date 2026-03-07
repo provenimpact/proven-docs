@@ -1,77 +1,70 @@
 = Implementation Tasks: AsciiDoc to PDF
-:version: 1.0.0
+:version: 2.0.0
 :status: Implemented
-:source-design-version: 1.0.0
-:source-stories-version: 1.0.0
-:source-spec-version: 1.0.0
+:source-design-version: 2.0.0
+:source-stories-version: 1.1.0
+:source-spec-version: 1.1.0
 :last-updated: 2026-03-05
 :feature: adoc-to-pdf
 :toc:
 
 == Overview
 
-Implement the adoc-to-pdf rendering pipeline: a CLI command that converts AsciiDoc files to PDF via headless browser printing. 3 phases, 7 tasks.
+Extend the adoc-to-pdf pipeline with Mermaid diagram rendering and source code syntax highlighting. Both capabilities use browser-side JavaScript injection into the existing Playwright/Chromium pipeline. 3 phases, 6 tasks.
 
-== Phase 1: Foundation
+== Phase 1: Dependencies and Enricher Module
 
-Set up the project structure, executable entry point, and CLI skeleton.
+Install new dependencies and create the HTML enricher module that injects mermaid.js and highlight.js into the rendered HTML.
 
-* [x] TASK-001: Create the executable entry point and CLI skeleton [sequential]
+* [x] TASK-008: Install mermaid and highlight.js dependencies [sequential]
 +
-Components:: bin/proven-docs.js, src/cli.js
-Stories:: US-004
-Specs:: PDF-010, PDF-011
-Description:: Create `bin/proven-docs.js` with shebang and import. Create `src/cli.js` with Commander program definition: a `render <input>` command with `-o, --output <path>` option. Add the `bin` field to `package.json`. Verify `--help` output works.
+Components:: package.json
+Stories:: US-005, US-006
+Specs:: PDF-014, PDF-019
+Description:: Install `mermaid` and `highlight.js` as production dependencies. Verify licenses are permissive (MIT, BSD-3-Clause). Run `npm ls` to confirm no licensing violations.
 
-== Phase 2: Core Pipeline
-
-Implement the AsciiDoc renderer and PDF printer modules.
-
-* [x] TASK-002: Implement the AsciiDoc renderer module [parallel]
+* [x] TASK-009: Create the HTML enricher module [sequential]
 +
-Components:: src/render.js
-Stories:: US-001
-Specs:: PDF-002
-Description:: Create `src/render.js` exporting `renderToHtml(source)`. Use `@asciidoctor/core` to convert AsciiDoc text to a standalone HTML document (`standalone: true`, `safe: 'safe'`). Return the HTML string.
+Components:: src/enrich.js
+Stories:: US-005, US-006
+Specs:: PDF-014, PDF-015, PDF-016, PDF-017, PDF-018, PDF-019, PDF-020, PDF-021, PDF-022
+Description:: Create `src/enrich.js` exporting `enrichHtml(html)`. At module load, read mermaid.min.js source from `node_modules/mermaid/dist/` and highlight.js core + github theme CSS from `node_modules/highlight.js/`. The function: (1) transforms Asciidoctor's `[source,mermaid]` output (`<code data-lang="mermaid">`) into `<pre class="mermaid">` elements, (2) injects mermaid.js with `mermaid.initialize({ startOnLoad: false })` and `mermaid.run()`, (3) injects highlight.js core + CSS theme + `hljs.highlightAll()`, (4) configures mermaid error handling to replace invalid blocks with styled error messages and emit `console.warn()`. Execution order: mermaid runs first, then highlight.js.
 
-* [x] TASK-003: Implement the PDF printer module [parallel]
+== Phase 2: Pipeline Integration
+
+Wire the enricher into the CLI pipeline and update the printer to handle browser-side JS execution.
+
+* [x] TASK-010: Integrate enricher into CLI pipeline [sequential]
++
+Components:: src/cli.js, src/enrich.js
+Stories:: US-005, US-006
+Specs:: PDF-014, PDF-019
+Description:: In the `render` command action handler, after `renderToHtml()` and before `printToPdf()`, call `enrichHtml(html)`. Pass the enriched HTML to the printer.
+
+* [x] TASK-011: Update printer to capture console warnings [parallel]
 +
 Components:: src/print.js
-Stories:: US-001
-Specs:: PDF-003
-Description:: Create `src/print.js` exporting `printToPdf(html, outputPath)`. Launch headless Chromium via `playwright`, set page content with `waitUntil: 'load'`, call `page.pdf({ path: outputPath, format: 'A4', printBackground: true })`. Ensure browser cleanup in a try/finally block.
+Stories:: US-005
+Specs:: PDF-017
+Description:: Register a `page.on('console')` listener before `setContent()`. Filter for `warning` type messages and forward them to `process.stderr`. This captures mermaid's error warnings for invalid diagram syntax. Ensure `waitUntil: 'load'` still works correctly with the injected scripts (the enricher's scripts run during page load).
 
-== Phase 3: Integration and Error Handling
+== Phase 3: Verification and License Audit
 
-Wire the pipeline into the CLI command, add input validation, error handling, and exit codes.
+Verify all new dependencies satisfy licensing constraints and the pipeline works end-to-end.
 
-* [x] TASK-004: Wire the render pipeline into the CLI command [sequential]
+* [x] TASK-012: Verify licensing for all new transitive dependencies [parallel]
 +
-Components:: src/cli.js, src/render.js, src/print.js
-Stories:: US-001, US-002
-Specs:: PDF-001, PDF-004, PDF-005
-Description:: In the `render` command action handler: read the input file, call `renderToHtml()`, resolve the output path (replace `.adoc` with `.pdf`, or use `--output` if provided), call `printToPdf()`, print success message. Handle default output path resolution and `--output` override.
+Components:: package.json, package-lock.json
+Stories:: US-005, US-006
+Specs:: (licensing constraint)
+Description:: Run a license audit on all new transitive dependencies from `mermaid` and `highlight.js`. Verify every dependency uses MIT, Apache-2.0, BSD, or ISC. Flag any violations.
 
-* [x] TASK-005: Add input file validation [parallel]
+* [x] TASK-013: End-to-end verification [sequential]
 +
-Components:: src/cli.js
-Stories:: US-003
-Specs:: PDF-006, PDF-007
-Description:: Before reading the file, check it exists and is readable using `fs.access()`. If not found, print `Error: File not found: <path>` to stderr and exit with code 1. If not readable, print `Error: Cannot read file: <path>` and exit with code 1.
-
-* [x] TASK-006: Add rendering and browser error handling [parallel]
-+
-Components:: src/cli.js
-Stories:: US-003
-Specs:: PDF-008, PDF-009
-Description:: Wrap the render and print calls in try/catch. If Asciidoctor produces errors, report them to stderr. If Playwright fails to launch the browser, catch the error and print a diagnostic message. Exit with code 1 on any failure.
-
-* [x] TASK-007: Ensure correct exit codes [sequential]
-+
-Components:: src/cli.js
-Stories:: US-004
-Specs:: PDF-012, PDF-013
-Description:: Verify all success paths exit with code 0 and all error paths exit with code 1. Ensure Commander does not swallow errors or override exit codes.
+Components:: src/cli.js, src/enrich.js, src/render.js, src/print.js
+Stories:: US-005, US-006
+Specs:: PDF-014, PDF-015, PDF-016, PDF-017, PDF-018, PDF-019, PDF-020, PDF-021, PDF-022
+Description:: Create test AsciiDoc files with Mermaid blocks (flowchart, sequence, C4Context) and source code blocks (JavaScript, Python, YAML). Run the CLI and inspect the output PDFs. Confirm diagrams are rendered as visuals (not raw text), code has syntax colours, invalid Mermaid produces error indication + stderr warning, unrecognised languages render as plain monospaced text.
 
 == Traceability
 
@@ -79,19 +72,11 @@ Description:: Verify all success paths exit with code 0 and all error paths exit
 |===
 | Story | Spec IDs | Tasks
 
-| US-001: Convert AsciiDoc File to PDF
-| PDF-001, PDF-002, PDF-003, PDF-004
-| TASK-002, TASK-003, TASK-004
+| US-005: Mermaid Diagram Rendering
+| PDF-014, PDF-015, PDF-016, PDF-017, PDF-018
+| TASK-008, TASK-009, TASK-010, TASK-011, TASK-013
 
-| US-002: Predictable Output Location
-| PDF-004, PDF-005
-| TASK-004
-
-| US-003: Conversion Error Reporting
-| PDF-006, PDF-007, PDF-008, PDF-009
-| TASK-005, TASK-006
-
-| US-004: CLI Integration
-| PDF-010, PDF-011, PDF-012, PDF-013
-| TASK-001, TASK-007
+| US-006: Source Code Syntax Highlighting
+| PDF-019, PDF-020, PDF-021, PDF-022
+| TASK-008, TASK-009, TASK-010, TASK-013
 |===

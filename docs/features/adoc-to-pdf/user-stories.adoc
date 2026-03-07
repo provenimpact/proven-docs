@@ -1,5 +1,5 @@
 = User Stories: AsciiDoc to PDF
-:version: 1.0.0
+:version: 1.1.0
 :last-updated: 2026-03-05
 :feature: adoc-to-pdf
 :toc:
@@ -50,3 +50,30 @@ Acceptance Criteria:
 * [ ] When the user runs the command with --help, the system shall display usage information.
 * [ ] The system shall exit with code 0 on successful conversion.
 * [ ] The system shall exit with a non-zero exit code on failure.
+
+== US-005: Mermaid Diagram Rendering
+As a documentation author,
+I want Mermaid diagram blocks in my AsciiDoc files to render as visual diagrams in the PDF,
+so that I can include architecture diagrams, flowcharts, and sequence diagrams without external tooling.
+
+Acceptance Criteria:
+
+* [ ] When the input AsciiDoc contains a Mermaid source block (e.g., `[source,mermaid]`), the system shall render the Mermaid syntax as a visual diagram in the PDF output.
+* [ ] The system shall support the Mermaid diagram types: flowchart, sequence, class, state, C4Context, C4Container, and C4Component.
+* [ ] The rendered diagrams shall be legible at the PDF page scale without manual zooming.
+* [ ] The system shall render Mermaid diagrams without requiring a network connection.
+* [ ] If a Mermaid block contains invalid syntax, then the system shall include an error indication in the PDF output and print a warning to stderr.
+* [ ] When an AsciiDoc file contains multiple Mermaid blocks, the system shall render each one independently.
+
+== US-006: Source Code Syntax Highlighting
+As a documentation author,
+I want source code blocks in my AsciiDoc files to render with syntax highlighting in the PDF,
+so that code examples are readable and visually distinguishable from prose.
+
+Acceptance Criteria:
+
+* [ ] When the input AsciiDoc contains a source code block with a language attribute (e.g., `[source,javascript]`), the system shall apply syntax highlighting to the code in the PDF output.
+* [ ] The system shall support syntax highlighting for commonly used languages including JavaScript, TypeScript, Python, Java, Ruby, Go, Rust, HTML, CSS, JSON, YAML, and shell scripts.
+* [ ] The highlighted code shall use a color scheme that is legible when printed on paper.
+* [ ] The system shall apply syntax highlighting without requiring a network connection.
+* [ ] When a source code block specifies an unrecognized language, the system shall render the code block without highlighting rather than failing.

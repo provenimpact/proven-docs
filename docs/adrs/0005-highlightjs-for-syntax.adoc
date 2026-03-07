@@ -1,0 +1,37 @@
+= ADR-0005: Use highlight.js for Syntax Highlighting
+:status: Accepted
+:date: 2026-03-05
+:deciders: User, AI assistant
+
+== Context
+
+Documentation authors include source code blocks with language attributes (e.g., `[source,javascript]`) in their AsciiDoc files. These code blocks must render with syntax highlighting in the PDF output — keywords, strings, comments, etc. shown in distinct colours. The highlighting must work offline and use a colour scheme legible on both screen and paper.
+
+== Decision
+
+Use highlight.js (BSD-3-Clause license) for syntax highlighting, loaded in the headless Chromium browser alongside the rendered HTML. The `@asciidoctor/core` renderer already emits `<pre><code class="language-xxx">` blocks when source blocks have a language attribute. The system bundles highlight.js and a print-friendly CSS theme, injects them into the HTML, and lets Chromium execute highlight.js to apply highlighting before PDF printing.
+
+This follows the same browser-side injection pattern used for fonts (ADR-0001 workaround) and Mermaid diagrams (ADR-0004).
+
+== Consequences
+
+* Highlight.js supports 190+ languages out of the box — far exceeding the minimum requirement (12 languages).
+* The library is mature, well-maintained, and widely used.
+* Using browser-side execution means highlight.js runs in Chromium's V8 engine — fast and reliable.
+* A print-friendly theme must be chosen or created to ensure legibility on paper (light background, sufficient contrast).
+* Unrecognised languages gracefully fall back to plain text (highlight.js default behaviour), satisfying PDF-022.
+* The library adds to the bundle injected into the HTML page, but highlight.js core + common languages is ~300KB, which is acceptable.
+
+== Alternatives Considered
+
+=== Asciidoctor source-highlighter attribute (server-side)
+
+Setting `:source-highlighter: highlight.js` in AsciiDoc attributes tells Asciidoctor to generate highlighted markup. However, in `@asciidoctor/core` (JavaScript), this attribute only adds CSS classes — it does not perform server-side highlighting. The actual highlighting still requires highlight.js to run client-side, so using this attribute alone is insufficient. We still need browser-side highlight.js execution.
+
+=== Shiki
+
+Shiki uses VS Code's TextMate grammars for high-fidelity highlighting and can run server-side in Node.js (producing pre-highlighted HTML). The quality is excellent and it would eliminate the need for browser-side execution. Rejected because it adds a large dependency (TextMate WASM runtime + grammar files), and the quality difference is marginal for PDF documentation. Highlight.js is simpler, lighter, and already sufficient for the use case. The licence (MIT) would satisfy constraints.
+
+=== Prism.js
+
+Prism is another browser-side syntax highlighter (MIT license). Rejected in favour of highlight.js because highlight.js has broader language support out of the box and Asciidoctor already emits CSS classes compatible with highlight.js.
