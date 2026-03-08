@@ -1,22 +1,14 @@
 # Proven Docs
 
-A CLI tool that converts AsciiDoc files to PDF using headless browser printing. Supports Mermaid diagram rendering and source code syntax highlighting.
-
-## How it works
-
-1. Reads an `.adoc` file
-2. Renders it to HTML via `@asciidoctor/core` (with bundled offline fonts)
-3. Applies syntax highlighting to code blocks (highlight.js, server-side)
-4. Transforms Mermaid diagram blocks for browser rendering
-5. Opens the HTML in a headless Chromium browser (Playwright)
-6. Renders Mermaid diagrams to inline SVG in the browser
-7. Prints to PDF using the browser's print engine
-8. Saves the PDF with the same name as the input file
+A CLI tool for working with AsciiDoc documentation. Converts AsciiDoc files to PDF using headless browser printing, with Mermaid diagram rendering and source code syntax highlighting. Includes commands for file watching, validation, and metadata inspection.
 
 ## Features
 
 - **Mermaid diagrams**: `[source,mermaid]` blocks render as visual SVG diagrams (flowchart, sequence, class, state, C4)
 - **Syntax highlighting**: `[source,<lang>]` blocks render with colour-coded syntax (190+ languages)
+- **File watching**: Automatically re-render PDFs when source files change
+- **Validation**: Check AsciiDoc files for errors, invalid Mermaid syntax, and unrecognized source languages without rendering
+- **Document info**: Inspect document metadata (title, author, revision, custom attributes) from the command line
 - **Fully offline**: No network requests during operation. Fonts, mermaid.js, and highlight.js are all bundled locally.
 - **Print-friendly**: Highlight.js `github` theme is legible on paper
 
@@ -33,21 +25,63 @@ npm install
 
 ## Usage
 
+### Render
+
+Convert an AsciiDoc file to PDF:
+
 ```bash
-node bin/proven-docs.js render <file.adoc>
+proven-docs render <file.adoc>
 ```
 
 Output goes to the same directory as the input file, with a `.pdf` extension:
 
 ```bash
-node bin/proven-docs.js render docs/report.adoc
+proven-docs render docs/report.adoc
 # produces docs/report.pdf
 ```
 
 Specify a custom output path:
 
 ```bash
-node bin/proven-docs.js render docs/report.adoc --output build/report.pdf
+proven-docs render docs/report.adoc --output build/report.pdf
+```
+
+### Watch
+
+Watch a file or directory and re-render on changes:
+
+```bash
+proven-docs watch docs/report.adoc
+proven-docs watch docs/          # watches all .adoc files in directory
+```
+
+### Validate
+
+Check an AsciiDoc file for errors without producing a PDF:
+
+```bash
+proven-docs validate docs/report.adoc
+```
+
+Reports AsciiDoc parse errors, invalid Mermaid syntax, and unrecognized source block languages. Exits with code 0 if no errors are found. Does not require a browser.
+
+### Info
+
+Display document metadata:
+
+```bash
+proven-docs info docs/report.adoc
+```
+
+Shows title, author, revision, date, and any user-defined attributes (e.g. `:classification:`, `:department:`).
+
+### Global flags
+
+All commands support `--verbose` (additional diagnostics to stderr) and `--quiet` (suppress non-error output). These flags are mutually exclusive.
+
+```bash
+proven-docs render report.adoc --verbose
+proven-docs validate report.adoc --quiet
 ```
 
 ## Running tests

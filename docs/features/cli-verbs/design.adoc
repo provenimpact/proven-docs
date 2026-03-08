@@ -1,0 +1,283 @@
+= Design: CLI Verbs and Subcommand Structure
+:version: 1.0.1
+:status: Current
+:source-stories-version: 1.0.0
+:source-spec-version: 1.0.0
+:last-updated: 2026-03-06
+:feature: cli-verbs
+:toc:
+
+== Technical Context
+
+Proven Docs is an existing Node.js ESM CLI tool. The current CLI lives entirely in `src/cli.js` — a single file that defines the Commander.js program and the `render` subcommand inline. The render action directly orchestrates reading, rendering, enriching, and printing.
+
+This feature restructures the CLI into a modular command layout (`src/commands/`) and adds three new subcommands: `watch`, `validate`, and `info`. The existing `render` pipeline (`render.js`, `enrich.js`, `print.js`) is not modified — new commands compose these modules or introduce new ones.
+
+== Decisions and Constraints
+
+* <<../../adrs/0003-commander-for-cli.adoc#,ADR-0003>>: Commander.js for CLI framework — all subcommands use Commander's API.
+* <<../../adrs/0006-chokidar-for-file-watching.adoc#,ADR-0006>>: Chokidar for file watching — the `watch` command uses chokidar to monitor files.
+* <<../../adrs/0001-asciidoctor-js-for-rendering.adoc#,ADR-0001>>: @asciidoctor/core — used by `validate` and `info` to parse AsciiDoc without full rendering.
+* <<../../adrs/0004-mermaid-for-diagrams.adoc#,ADR-0004>>: Mermaid.js — `validate` uses mermaid's `parse()` API in Node.js to check syntax without a browser.
+* Constraint: Licensing — chokidar is MIT licensed (satisfies no-copyleft).
+* Constraint: Connectivity — all commands work fully offline.
+
+== Research and Unknowns
+
+=== Mermaid validation without a browser
+
+The current pipeline renders Mermaid diagrams browser-side in Chromium. The `validate` command must check Mermaid syntax without launching a browser (CLI-014). Mermaid's npm package exports a `parse()` function that validates syntax in Node.js without rendering to SVG. This works because mermaid's parser is JavaScript-based and does not require a DOM.
+
+[source,javascript]
+----
+import mermaid from 'mermaid';
+await mermaid.parse(diagramSource); // throws on invalid syntax
+----
+
+However, mermaid's `parse()` requires initialization first (`mermaid.initialize()`). Since mermaid is already a dependency, no new dependency is needed. The initialization is lightweight and can run once per validate invocation.
+
+=== highlight.js language recognition
+
+The `validate` command needs to check if source blocks specify a recognized language (CLI-012). The `highlight.js` package exposes `hljs.getLanguage(lang)` which returns `undefined` for unrecognized languages. This is already used in `src/enrich.js` and requires no new dependency.
+
+== System Design
+
+=== Module layout
+
+The CLI is restructured from a monolithic `src/cli.js` into a modular layout:
+
+....
+src/
+├── cli.js                  # Program setup, version, command registration
+├── commands/
+│   ├── shared.js           # Shared utilities (output flag validation)
+│   ├── render.js           # render subcommand (extracted from current cli.js)
+│   ├── watch.js            # watch subcommand (new)
+│   ├── validate.js         # validate subcommand (new)
+│   └── info.js             # info subcommand (new)
+├── render.js               # AsciiDoc → HTML (unchanged)
+├── enrich.js               # HTML enrichment (unchanged)
+└── print.js                # HTML → PDF via Playwright (unchanged)
+....
+
+=== Component interaction
+
+[source,mermaid]
+----
+flowchart TD
+    BIN["bin/proven-docs.js"] --> CLI["src/cli.js<br/>(program setup, global opts)"]
+
+    CLI --> RENDER_CMD["src/commands/render.js"]
+    CLI --> WATCH_CMD["src/commands/watch.js"]
+    CLI --> VALIDATE_CMD["src/commands/validate.js"]
+    CLI --> INFO_CMD["src/commands/info.js"]
+
+    RENDER_CMD --> RENDER["src/render.js"]
+    RENDER_CMD --> ENRICH["src/enrich.js"]
+    RENDER_CMD --> PRINT["src/print.js"]
+
+    WATCH_CMD --> CHOKIDAR["chokidar"]
+    WATCH_CMD --> RENDER["src/render.js"]
+    WATCH_CMD --> ENRICH["src/enrich.js"]
+    WATCH_CMD --> PRINT["src/print.js"]
+
+    VALIDATE_CMD --> ASCIIDOCTOR["@asciidoctor/core"]
+    VALIDATE_CMD --> MERMAID["mermaid (parse)"]
+    VALIDATE_CMD --> HLJS["highlight.js"]
+
+    INFO_CMD --> ASCIIDOCTOR
+----
+
+=== src/cli.js (restructured)
+
+The restructured `cli.js` is responsible for:
+
+1. Creating the Commander program with name, description, and version (read from `package.json`)
+2. Importing and registering each subcommand from `src/commands/`
+3. Calling `program.parse()`
+
+Each subcommand defines its own `--verbose` and `--quiet` options (Commander.js does not support global option inheritance in subcommand `--help` output). The shared `validateOutputFlags()` helper in `src/commands/shared.js` rejects the `--verbose + --quiet` combination at the start of each action.
+
+=== src/commands/shared.js
+
+Shared utility module for cross-cutting concerns across all subcommands.
+
+Exports `validateOutputFlags(options)` — checks if both `--verbose` and `--quiet` are set, exits with code 1 and an error message if so. Called at the top of every subcommand action.
+
+=== src/commands/render.js
+
+Extracted from the current `src/cli.js` render action. The module exports a function that registers the `render` subcommand on the program. The action logic is identical to the current implementation, with the addition of `--verbose`/`--quiet` awareness:
+
+* **--verbose**: Print diagnostic info to stderr (e.g., "Parsing AsciiDoc...", "Enriching HTML...", "Launching browser...", timing info).
+* **--quiet**: Suppress the "Created <path>" success message. Only errors go to stderr.
+
+=== src/commands/watch.js
+
+Implements the `watch` subcommand using chokidar.
+
+**Behavior:**
+
+1. Accept `<file|dir>` argument and optional `--output <path>` flag
+2. On startup, perform an initial render of the target file(s) using the render pipeline
+3. Create a chokidar watcher on the target path
+4. On `change` events for `.adoc` files, re-render the changed file
+5. Print a message to stdout on each successful re-render: `Rendered <output-path>`
+6. If a re-render fails, print the error to stderr and continue watching
+7. On SIGINT, close the watcher and exit cleanly
+
+**File vs. directory mode:**
+
+* **File mode**: `proven-docs watch report.adoc` — watches one file, renders to `report.pdf` (or `--output` path)
+* **Directory mode**: `proven-docs watch ./docs/` — watches all `.adoc` files in the directory. Each file renders to its own PDF (same name, `.pdf` extension). The `--output` flag is not supported in directory mode (each file produces its own PDF).
+
+**Watch sequence:**
+
+[source,mermaid]
+----
+sequenceDiagram
+    participant User
+    participant CLI as watch command
+    participant Chokidar
+    participant Pipeline as render pipeline
+
+    User->>CLI: proven-docs watch report.adoc
+    CLI->>Pipeline: initial render(report.adoc)
+    Pipeline-->>CLI: report.pdf created
+    CLI->>User: Rendered report.pdf
+
+    CLI->>Chokidar: watch(report.adoc)
+    Note over Chokidar: monitoring...
+
+    User->>User: edits report.adoc
+    Chokidar-->>CLI: change event
+    CLI->>Pipeline: re-render(report.adoc)
+    Pipeline-->>CLI: report.pdf updated
+    CLI->>User: Rendered report.pdf
+
+    User->>CLI: Ctrl+C (SIGINT)
+    CLI->>Chokidar: close()
+    CLI->>User: exit 0
+----
+
+**Debouncing:** The watcher uses a 300ms debounce to coalesce rapid file system events from editors that perform atomic saves (write to temp file, rename).
+
+=== src/commands/validate.js
+
+Implements the `validate` subcommand. Validates an AsciiDoc file without producing a PDF or launching a browser.
+
+**Validation checks:**
+
+1. **File existence** — does the input file exist and is it readable?
+2. **AsciiDoc parsing** — parse the file with @asciidoctor/core in safe mode, collect any errors/warnings from the logger
+3. **Mermaid syntax** — find all `[source,mermaid]` blocks in the parsed document, run `mermaid.parse()` on each. Report syntax errors with block location.
+4. **Source language recognition** — find all `[source,<lang>]` blocks (non-mermaid), check each language against `hljs.getLanguage()`. Report unrecognized languages as warnings.
+
+**Output format:**
+
+....
+Validating report.adoc...
+  WARN: Unrecognized source language "brainfuck" (line 45)
+  ERROR: Invalid Mermaid syntax in block at line 78: Parse error on line 2...
+
+1 error, 1 warning
+....
+
+**Exit codes:**
+
+* 0 — no errors (warnings are OK)
+* 1 — one or more errors found
+
+**Verbose mode** adds additional diagnostics (number of blocks found, parse timing). **Quiet mode** suppresses the "Validating..." header and warning-level messages; only errors are shown.
+
+**Asciidoctor logging:** @asciidoctor/core supports a custom `MemoryLogger` that collects messages instead of printing them. The validate command uses this to capture warnings and errors from the AsciiDoc parser:
+
+[source,javascript]
+----
+const asciidoctor = Asciidoctor();
+const logger = asciidoctor.MemoryLogger.create();
+asciidoctor.LoggerManager.setLogger(logger);
+const doc = asciidoctor.load(source, { safe: 'safe' });
+const messages = logger.getMessages();
+----
+
+=== src/commands/info.js
+
+Implements the `info` subcommand. Parses an AsciiDoc file and displays its document attributes.
+
+**Behavior:**
+
+1. Read and parse the file with @asciidoctor/core (using `load()` to get the document object without full conversion)
+2. Extract the document title, author, revision number, and revision date from the document API
+3. Extract all user-defined attributes via `doc.getAttributes()`
+4. Print standard attributes first (title, author, revnumber, revdate), then user-defined attributes
+5. Omit any standard attribute that is not set
+
+**Output format:**
+
+....
+Title:      Quarterly Risk Assessment
+Author:     Jane Smith
+Revision:   1.2
+Date:       2026-03-06
+---
+classification: CONFIDENTIAL
+department:     Risk & Compliance
+document-id:    RISK-2026-Q1
+----
+
+**Filtering built-in attributes:** Asciidoctor sets many internal attributes (e.g., `backend`, `doctype`, `outfilesuffix`). The info command filters these out and only shows:
+
+* Standard document header attributes: title, author, revnumber, revdate, email, firstname, lastname, etc.
+* User-defined attributes: any attribute set with `:name: value` in the document header that is not an Asciidoctor internal
+
+A known-internals list is used to filter (Asciidoctor's internal attributes follow patterns like `asciidoctor-*`, `backend`, `basebackend`, `doctype`, `filetype`, `outfilesuffix`, etc.).
+
+== Story Resolution
+
+=== US-001: Watch for Changes and Re-render
+
+Components:: `src/commands/watch.js`, chokidar, render pipeline (`render.js`, `enrich.js`, `print.js`)
+Criteria::
+* Watch renders immediately then monitors → watch.js performs initial render then starts chokidar watcher (CLI-001)
+* Re-renders on file change → chokidar `change` event triggers re-render (CLI-002)
+* Prints message with path on re-render → stdout message after each successful render (CLI-003)
+* Watch monitors directory of .adoc files → chokidar watches directory with `*.adoc` glob (CLI-004)
+* Runs until terminated → chokidar watcher stays open, SIGINT handler for cleanup (CLI-005)
+* Continues after re-render failure → try/catch around render pipeline, error to stderr (CLI-006)
+* Accepts --output flag → Commander option on watch subcommand (CLI-007)
+
+=== US-002: Validate AsciiDoc Without Rendering
+
+Components:: `src/commands/validate.js`, @asciidoctor/core (MemoryLogger), mermaid (parse), highlight.js (getLanguage)
+Criteria::
+* Parses without producing PDF → uses asciidoctor.load(), no print.js invocation (CLI-008)
+* Exits 0 on success → exit(0) when error count is 0 (CLI-009)
+* Exits non-zero with error descriptions → exit(1) with formatted error output (CLI-010)
+* Checks Mermaid syntax → mermaid.parse() on each mermaid block (CLI-011)
+* Checks source language recognition → hljs.getLanguage() on each source block (CLI-012)
+* File-not-found error → fs.accessSync check before parsing (CLI-013)
+* No browser launched → no Playwright/print.js dependency (CLI-014)
+
+=== US-003: Show Document Metadata
+
+Components:: `src/commands/info.js`, @asciidoctor/core
+Criteria::
+* Prints document attributes → asciidoctor.load() + doc.getAttributes() (CLI-015)
+* Shows title, author, revision, date → extracted from document API (CLI-016)
+* Shows user-defined attributes → filtered from getAttributes() (CLI-017)
+* Omits unset attributes → conditional output, skip if null/undefined (CLI-018)
+* File-not-found error → fs.accessSync check before parsing (CLI-019)
+* No browser launched → no Playwright/print.js dependency (CLI-020)
+
+=== US-004: Modular Command Structure
+
+Components:: `src/cli.js` (restructured), `src/commands/render.js`, `src/commands/watch.js`, `src/commands/validate.js`, `src/commands/info.js`
+Criteria::
+* Four subcommands available → each registered on the Commander program (CLI-021)
+* --version displays version → program.version() reads from package.json (CLI-022)
+* --help lists subcommands → Commander built-in help generation (CLI-023)
+* Subcommand --help shows usage → Commander built-in per-command help (CLI-024)
+* --verbose and --quiet on all subcommands → per-subcommand options with shared validation (CLI-025)
+* --verbose prints diagnostics → conditional stderr output in each command (CLI-026)
+* --quiet suppresses non-error output → conditional stdout suppression (CLI-027)
+* --verbose + --quiet is an error → shared validateOutputFlags() rejects combination (CLI-028)

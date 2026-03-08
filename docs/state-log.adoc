@@ -1,5 +1,31 @@
 = State Transition Log
-:last-updated: 2026-03-05
+:last-updated: 2026-03-07
+
+== TRANSITION-004
+:date: 2026-03-07
+:intent: AsciiDoc include directives resolve relative to the document's directory, not CWD
+:type: Feature evolution
+:risk: Medium
+:features: adoc-to-pdf (extended)
+:desired-state: When rendering, validating, or inspecting an AsciiDoc file from any working directory, include:: directives resolve relative to the document's own directory
+:prior-state: adoc-to-pdf implemented (v1.1.0) -- all commands read source as string and pass to Asciidoctor without base_dir, so includes resolve relative to CWD
+:capabilities-invoked: needs-stories, needs-spec, needs-design, needs-tasks, needs-tests, needs-implementation
+:constraints-checked: Licensing (pass -- no new dependencies), Connectivity (pass -- base_dir is a local path option, no network requests)
+:result: Achieved
+:artifacts-modified: docs/features/adoc-to-pdf/user-stories.adoc (v1.2.0), docs/features/adoc-to-pdf/spec.adoc (v1.2.0), docs/features/adoc-to-pdf/design.adoc (v2.1.0), docs/features/adoc-to-pdf/tasks.adoc (v3.0.0), src/render.js (updated), src/commands/render.js (updated), src/commands/validate.js (updated), src/commands/info.js (updated), tests/features/adoc-to-pdf/render.test.js (updated), tests/features/adoc-to-pdf/include-resolution.test.js (new)
+
+== TRANSITION-003
+:date: 2026-03-06
+:intent: Expand CLI with common verbs and subcommand structure
+:type: Feature evolution
+:risk: High
+:features: cli-verbs (new)
+:desired-state: proven-docs provides verb-based subcommands (render, watch, validate, info) with consistent flags, each verb as a separate module under src/commands/
+:prior-state: Single render subcommand in src/cli.js, no watch/validate/info commands, no src/commands/ module structure
+:capabilities-invoked: needs-stories, needs-spec, needs-design, needs-adr, needs-tasks, needs-tests, needs-implementation, needs-architecture
+:constraints-checked: Licensing (pass -- chokidar MIT, all 188 deps permissive), Connectivity (pass -- all commands work offline, chokidar uses local fs events)
+:result: Achieved
+:artifacts-modified: docs/features/cli-verbs/user-stories.adoc (v1.0.0), docs/features/cli-verbs/spec.adoc (v1.0.0), docs/features/cli-verbs/design.adoc (v1.0.1), docs/features/cli-verbs/tasks.adoc (v1.0.0), docs/adrs/0006-chokidar-for-file-watching.adoc (new), docs/adrs/index.adoc (v1.2.0), docs/architecture.adoc (v1.2.0), src/cli.js (restructured), src/commands/shared.js (new), src/commands/render.js (new), src/commands/watch.js (new), src/commands/validate.js (new), src/commands/info.js (new), package.json (chokidar added), tests/features/cli-verbs/cli-structure.test.js (new), tests/features/cli-verbs/validate.test.js (new), tests/features/cli-verbs/info.test.js (new), tests/features/cli-verbs/watch.test.js (new)
 
 == TRANSITION-002
 :date: 2026-03-05

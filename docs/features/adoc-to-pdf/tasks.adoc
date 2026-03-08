@@ -1,70 +1,48 @@
 = Implementation Tasks: AsciiDoc to PDF
-:version: 2.0.0
+:version: 3.0.0
 :status: Implemented
-:source-design-version: 2.0.0
-:source-stories-version: 1.1.0
-:source-spec-version: 1.1.0
-:last-updated: 2026-03-05
+:source-design-version: 2.1.0
+:source-stories-version: 1.2.0
+:source-spec-version: 1.2.0
+:last-updated: 2026-03-07
 :feature: adoc-to-pdf
 :toc:
 
 == Overview
 
-Extend the adoc-to-pdf pipeline with Mermaid diagram rendering and source code syntax highlighting. Both capabilities use browser-side JavaScript injection into the existing Playwright/Chromium pipeline. 3 phases, 6 tasks.
+Fix include directive resolution so that `include::` paths resolve relative to the document's directory, not the CLI's working directory. Affects render, validate, and info commands. 1 phase, 4 tasks.
 
-== Phase 1: Dependencies and Enricher Module
+== Phase 1: Include Resolution
 
-Install new dependencies and create the HTML enricher module that injects mermaid.js and highlight.js into the rendered HTML.
+Add `base_dir` to all Asciidoctor calls so includes resolve relative to the input file's directory.
 
-* [x] TASK-008: Install mermaid and highlight.js dependencies [sequential]
+* [x] TASK-014: Update renderToHtml to accept and pass base_dir [parallel]
 +
-Components:: package.json
-Stories:: US-005, US-006
-Specs:: PDF-014, PDF-019
-Description:: Install `mermaid` and `highlight.js` as production dependencies. Verify licenses are permissive (MIT, BSD-3-Clause). Run `npm ls` to confirm no licensing violations.
+Components:: src/render.js
+Stories:: US-007
+Specs:: PDF-023, PDF-024
+Description:: Change `renderToHtml(source)` signature to `renderToHtml(source, baseDir)`. When `baseDir` is provided, add `base_dir: baseDir` to the Asciidoctor `convert()` options object. When omitted, do not set `base_dir` (backward compatible).
 
-* [x] TASK-009: Create the HTML enricher module [sequential]
+* [x] TASK-015: Pass base_dir from render command [parallel]
 +
-Components:: src/enrich.js
-Stories:: US-005, US-006
-Specs:: PDF-014, PDF-015, PDF-016, PDF-017, PDF-018, PDF-019, PDF-020, PDF-021, PDF-022
-Description:: Create `src/enrich.js` exporting `enrichHtml(html)`. At module load, read mermaid.min.js source from `node_modules/mermaid/dist/` and highlight.js core + github theme CSS from `node_modules/highlight.js/`. The function: (1) transforms Asciidoctor's `[source,mermaid]` output (`<code data-lang="mermaid">`) into `<pre class="mermaid">` elements, (2) injects mermaid.js with `mermaid.initialize({ startOnLoad: false })` and `mermaid.run()`, (3) injects highlight.js core + CSS theme + `hljs.highlightAll()`, (4) configures mermaid error handling to replace invalid blocks with styled error messages and emit `console.warn()`. Execution order: mermaid runs first, then highlight.js.
+Components:: src/commands/render.js
+Stories:: US-007
+Specs:: PDF-023, PDF-024
+Description:: In the render command handler, after resolving `inputPath`, derive `baseDir` as `path.dirname(inputPath)`. Pass `baseDir` as the second argument to `renderToHtml(source, baseDir)`.
 
-== Phase 2: Pipeline Integration
-
-Wire the enricher into the CLI pipeline and update the printer to handle browser-side JS execution.
-
-* [x] TASK-010: Integrate enricher into CLI pipeline [sequential]
+* [x] TASK-016: Pass base_dir from validate command [parallel]
 +
-Components:: src/cli.js, src/enrich.js
-Stories:: US-005, US-006
-Specs:: PDF-014, PDF-019
-Description:: In the `render` command action handler, after `renderToHtml()` and before `printToPdf()`, call `enrichHtml(html)`. Pass the enriched HTML to the printer.
+Components:: src/commands/validate.js
+Stories:: US-007
+Specs:: PDF-023, PDF-025
+Description:: In the validate command handler, add `base_dir: path.dirname(filePath)` to the options object passed to `asciidoctor.load()`.
 
-* [x] TASK-011: Update printer to capture console warnings [parallel]
+* [x] TASK-017: Pass base_dir from info command [parallel]
 +
-Components:: src/print.js
-Stories:: US-005
-Specs:: PDF-017
-Description:: Register a `page.on('console')` listener before `setContent()`. Filter for `warning` type messages and forward them to `process.stderr`. This captures mermaid's error warnings for invalid diagram syntax. Ensure `waitUntil: 'load'` still works correctly with the injected scripts (the enricher's scripts run during page load).
-
-== Phase 3: Verification and License Audit
-
-Verify all new dependencies satisfy licensing constraints and the pipeline works end-to-end.
-
-* [x] TASK-012: Verify licensing for all new transitive dependencies [parallel]
-+
-Components:: package.json, package-lock.json
-Stories:: US-005, US-006
-Specs:: (licensing constraint)
-Description:: Run a license audit on all new transitive dependencies from `mermaid` and `highlight.js`. Verify every dependency uses MIT, Apache-2.0, BSD, or ISC. Flag any violations.
-
-* [x] TASK-013: End-to-end verification [sequential]
-+
-Components:: src/cli.js, src/enrich.js, src/render.js, src/print.js
-Stories:: US-005, US-006
-Specs:: PDF-014, PDF-015, PDF-016, PDF-017, PDF-018, PDF-019, PDF-020, PDF-021, PDF-022
-Description:: Create test AsciiDoc files with Mermaid blocks (flowchart, sequence, C4Context) and source code blocks (JavaScript, Python, YAML). Run the CLI and inspect the output PDFs. Confirm diagrams are rendered as visuals (not raw text), code has syntax colours, invalid Mermaid produces error indication + stderr warning, unrecognised languages render as plain monospaced text.
+Components:: src/commands/info.js
+Stories:: US-007
+Specs:: PDF-023, PDF-026
+Description:: In the info command handler, add `base_dir: path.dirname(filePath)` to the options object passed to `asciidoctor.load()`.
 
 == Traceability
 
@@ -72,11 +50,7 @@ Description:: Create test AsciiDoc files with Mermaid blocks (flowchart, sequenc
 |===
 | Story | Spec IDs | Tasks
 
-| US-005: Mermaid Diagram Rendering
-| PDF-014, PDF-015, PDF-016, PDF-017, PDF-018
-| TASK-008, TASK-009, TASK-010, TASK-011, TASK-013
-
-| US-006: Source Code Syntax Highlighting
-| PDF-019, PDF-020, PDF-021, PDF-022
-| TASK-008, TASK-009, TASK-010, TASK-013
+| US-007: Include Directive Resolution
+| PDF-023, PDF-024, PDF-025, PDF-026, PDF-027
+| TASK-014, TASK-015, TASK-016, TASK-017
 |===

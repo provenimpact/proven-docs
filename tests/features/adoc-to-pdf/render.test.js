@@ -1,14 +1,18 @@
 // Feature: adoc-to-pdf
-// Spec version: 1.0.0
+// Spec version: 1.2.0
 // Generated from: spec.adoc
 //
 // Spec coverage:
 //   PDF-002: Render AsciiDoc to HTML
+//   PDF-023: Include directives resolve relative to input file (unit)
 //
 // Test level: Unit
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { renderToHtml } from '../../../src/render.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 
 describe('PDF-002: Render AsciiDoc content to HTML', () => {
   it('should convert AsciiDoc source to a standalone HTML document', () => {
@@ -49,5 +53,34 @@ describe('PDF-002: Render AsciiDoc content to HTML', () => {
     expect(html).toContain('<head>');
     expect(html).toContain('<body');
     expect(html).toContain('</body>');
+  });
+});
+
+describe('PDF-023: Include directives resolve relative to base directory (unit)', () => {
+  let tmpDir;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'proven-docs-render-unit-'));
+    const subDir = path.join(tmpDir, 'sub');
+    fs.mkdirSync(subDir, { recursive: true });
+    fs.writeFileSync(path.join(subDir, 'part.adoc'), 'Included part content.\n');
+  });
+
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('should resolve include directives when baseDir is provided', () => {
+    const source = '= Test\n\ninclude::sub/part.adoc[]\n';
+    const html = renderToHtml(source, tmpDir);
+
+    expect(html).toContain('Included part content.');
+  });
+
+  it('should still work without baseDir (backward compatible)', () => {
+    const source = '= Test\n\nHello.';
+    const html = renderToHtml(source);
+
+    expect(html).toContain('Hello.');
   });
 });

@@ -1,0 +1,34 @@
+= ADR-0006: Use Chokidar for File Watching
+:status: Accepted
+:date: 2026-03-06
+:deciders: Project team
+
+== Context
+
+The `watch` subcommand needs to monitor files and directories for changes and trigger re-renders automatically. Node.js provides a built-in `fs.watch` API, but it has well-documented cross-platform inconsistencies: duplicate events on macOS, missing events on Linux with certain editors, and no recursive directory watching on some platforms.
+
+A reliable file watcher is critical for the developer experience — missed or duplicate events directly impact the usefulness of the watch command.
+
+== Decision
+
+Use `chokidar` as the file system watcher library.
+
+== Consequences
+
+* Reliable, battle-tested file watching across macOS, Linux, and Windows.
+* Handles editor save patterns (atomic writes, temp files) without duplicate events.
+* Supports recursive directory watching out of the box.
+* MIT licensed (satisfies the no-copyleft constraint).
+* Adds one dependency to the production dependency graph (chokidar has minimal transitive dependencies in v4).
+* Runs entirely locally with no network access (satisfies the offline constraint).
+
+== Alternatives Considered
+
+=== Node.js built-in fs.watch
+Available without additional dependencies. Rejected due to well-documented cross-platform inconsistencies: duplicate events on macOS (FSEvents), missing events on Linux with editors that use atomic saves, no recursive watching on all platforms. The watch command requires reliable behavior across all platforms.
+
+=== @parcel/watcher
+A native (Rust/C++) file watcher with excellent performance. Rejected because it requires native compilation which complicates installation and CI environments. Chokidar's pure-JavaScript approach (with optional native extensions) is more portable.
+
+=== nodemon / watchpack
+Higher-level wrappers around file watching. Rejected because they are designed for specific use cases (server restart, webpack builds) and carry unnecessary abstractions and dependencies for our simple watch-and-rerender use case.

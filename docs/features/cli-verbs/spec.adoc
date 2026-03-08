@@ -1,0 +1,330 @@
+= Specification: CLI Verbs and Subcommand Structure
+:version: 1.0.0
+:source-stories-version: 1.0.0
+:last-updated: 2026-03-06
+:feature: cli-verbs
+:prefix: CLI
+:toc:
+
+== Watch Command
+
+=== CLI-001
+When the user runs `proven-docs watch <file>`, the system shall render the file to PDF immediately and then monitor it for subsequent changes.
+
+Type:: Event-driven
+Source:: US-001: Criterion 1
+Verification:: Run `proven-docs watch sample.adoc`. Confirm that a PDF is produced immediately and the process continues to run.
+
+=== CLI-002
+When the watched file is modified, the system shall re-render the PDF automatically.
+
+Type:: Event-driven
+Source:: US-001: Criterion 2
+Verification:: With the watch process running, edit and save the watched .adoc file. Confirm that the PDF is regenerated without user intervention.
+
+=== CLI-003
+When a re-render completes, the system shall print a message to stdout including the output file path.
+
+Type:: Event-driven
+Source:: US-001: Criterion 3
+Verification:: Modify a watched file. Confirm that a message appears on stdout containing the output PDF path.
+
+=== CLI-004
+When the user runs `proven-docs watch <directory>`, the system shall monitor all .adoc files in that directory and re-render any file that is modified.
+
+Type:: Event-driven
+Source:: US-001: Criterion 4
+Verification:: Run `proven-docs watch ./docs/`. Modify an .adoc file in the directory. Confirm that only the modified file is re-rendered.
+
+=== CLI-005
+While the watch process is active, the system shall continue monitoring until the user terminates the process.
+
+Type:: State-driven
+Source:: US-001: Criterion 5
+Verification:: Start the watch process. Confirm it runs continuously until terminated with Ctrl+C or SIGINT.
+
+=== CLI-006
+If a re-render fails during watch mode, then the system shall print the error to stderr and continue watching for further changes.
+
+Type:: Unwanted behavior
+Source:: US-001: Criterion 6
+Verification:: Introduce a syntax error into a watched .adoc file and save it. Confirm the error is printed to stderr. Fix the error and save again. Confirm the file re-renders successfully.
+
+=== CLI-007
+The watch command shall accept the `--output` flag to control the PDF output location.
+
+Type:: Ubiquitous
+Source:: US-001: Criterion 7
+Verification:: Run `proven-docs watch sample.adoc --output /tmp/out.pdf`. Confirm the PDF is written to the specified path on each render.
+
+== Validate Command
+
+=== CLI-008
+When the user runs `proven-docs validate <file>`, the system shall parse the AsciiDoc file and report any errors or warnings without producing a PDF.
+
+Type:: Event-driven
+Source:: US-002: Criterion 1
+Verification:: Run `proven-docs validate sample.adoc` on a valid file. Confirm no PDF is produced and the output indicates the file is valid.
+
+=== CLI-009
+When validation passes with no errors, the system shall exit with code 0.
+
+Type:: Event-driven
+Source:: US-002: Criterion 2
+Verification:: Run `proven-docs validate` on a valid file. Confirm the exit code is 0.
+
+=== CLI-010
+If the AsciiDoc file contains errors, then the system shall exit with a non-zero exit code and print each error with a description.
+
+Type:: Unwanted behavior
+Source:: US-002: Criterion 3
+Verification:: Run `proven-docs validate` on a file with known AsciiDoc errors. Confirm a non-zero exit code and error descriptions on stderr.
+
+=== CLI-011
+The validate command shall check that Mermaid source blocks contain syntactically valid Mermaid markup.
+
+Type:: Ubiquitous
+Source:: US-002: Criterion 4
+Verification:: Run `proven-docs validate` on a file with an invalid Mermaid block. Confirm the invalid Mermaid syntax is reported.
+
+=== CLI-012
+The validate command shall check that source code blocks specify a recognized language attribute.
+
+Type:: Ubiquitous
+Source:: US-002: Criterion 5
+Verification:: Run `proven-docs validate` on a file with a source block using an unrecognized language. Confirm a warning is reported.
+
+=== CLI-013
+If the specified file does not exist, then the validate command shall exit with a non-zero exit code and print an error message identifying the missing file.
+
+Type:: Unwanted behavior
+Source:: US-002: Criterion 6
+Verification:: Run `proven-docs validate nonexistent.adoc`. Confirm a non-zero exit code and an error message mentioning the file path.
+
+=== CLI-014
+The validate command shall complete without launching a headless browser.
+
+Type:: Ubiquitous
+Source:: US-002: Criterion 7
+Verification:: Run `proven-docs validate` and monitor system processes. Confirm no Chromium or browser process is spawned.
+
+== Info Command
+
+=== CLI-015
+When the user runs `proven-docs info <file>`, the system shall parse the AsciiDoc file and print its document attributes to stdout.
+
+Type:: Event-driven
+Source:: US-003: Criterion 1
+Verification:: Run `proven-docs info sample.adoc`. Confirm document attributes are printed to stdout.
+
+=== CLI-016
+The info command shall display at minimum: document title, author, revision number, and revision date when present in the document header.
+
+Type:: Ubiquitous
+Source:: US-003: Criterion 2
+Verification:: Run `proven-docs info` on a file with title, author, revnumber, and revdate set. Confirm all four are displayed.
+
+=== CLI-017
+The info command shall display all user-defined document attributes.
+
+Type:: Ubiquitous
+Source:: US-003: Criterion 3
+Verification:: Run `proven-docs info` on a file with custom attributes (e.g., `:classification:`, `:department:`). Confirm they appear in the output.
+
+=== CLI-018
+If a standard attribute is not set in the document, then the info command shall omit it from the output rather than displaying an empty value.
+
+Type:: Unwanted behavior
+Source:: US-003: Criterion 4
+Verification:: Run `proven-docs info` on a file without an author attribute. Confirm that the author field is not present in the output.
+
+=== CLI-019
+If the specified file does not exist, then the info command shall exit with a non-zero exit code and print an error message identifying the missing file.
+
+Type:: Unwanted behavior
+Source:: US-003: Criterion 5
+Verification:: Run `proven-docs info nonexistent.adoc`. Confirm a non-zero exit code and an error message mentioning the file path.
+
+=== CLI-020
+The info command shall complete without launching a headless browser.
+
+Type:: Ubiquitous
+Source:: US-003: Criterion 6
+Verification:: Run `proven-docs info` and monitor system processes. Confirm no Chromium or browser process is spawned.
+
+== Subcommand Structure
+
+=== CLI-021
+The system shall provide `render`, `watch`, `validate`, and `info` as top-level subcommands.
+
+Type:: Ubiquitous
+Source:: US-004: Criterion 1
+Verification:: Run `proven-docs --help`. Confirm that render, watch, validate, and info are listed as available subcommands.
+
+=== CLI-022
+When the user runs `proven-docs --version`, the system shall display the current version number.
+
+Type:: Event-driven
+Source:: US-004: Criterion 2
+Verification:: Run `proven-docs --version`. Confirm the output contains the version number matching package.json.
+
+=== CLI-023
+When the user runs `proven-docs --help`, the system shall list all available subcommands with descriptions.
+
+Type:: Event-driven
+Source:: US-004: Criterion 3
+Verification:: Run `proven-docs --help`. Confirm that each subcommand appears with a description.
+
+=== CLI-024
+When the user runs any subcommand with `--help`, the system shall display usage information specific to that subcommand.
+
+Type:: Event-driven
+Source:: US-004: Criterion 4
+Verification:: Run `proven-docs watch --help`. Confirm that watch-specific options and arguments are described.
+
+=== CLI-025
+The system shall support `--verbose` and `--quiet` flags on all subcommands that produce output.
+
+Type:: Ubiquitous
+Source:: US-004: Criterion 5
+Verification:: Run each subcommand with `--help`. Confirm that `--verbose` and `--quiet` appear as options.
+
+=== CLI-026
+While the `--verbose` flag is active, the system shall print additional diagnostic information to stderr.
+
+Type:: State-driven
+Source:: US-004: Criterion 6
+Verification:: Run `proven-docs render sample.adoc --verbose`. Confirm additional diagnostic output appears on stderr.
+
+=== CLI-027
+While the `--quiet` flag is active, the system shall suppress all non-error output.
+
+Type:: State-driven
+Source:: US-004: Criterion 7
+Verification:: Run `proven-docs render sample.adoc --quiet`. Confirm that no output appears on stdout on success.
+
+=== CLI-028
+If the user provides both `--verbose` and `--quiet`, then the system shall print an error and exit with a non-zero exit code.
+
+Type:: Unwanted behavior
+Source:: US-004: Criterion 8
+Verification:: Run `proven-docs render sample.adoc --verbose --quiet`. Confirm an error message is printed and the exit code is non-zero.
+
+== Traceability
+
+[cols="1,2,2", options="header"]
+|===
+| Requirement ID | Requirement Summary | Source
+
+| CLI-001
+| Watch renders immediately then monitors
+| US-001: Criterion 1
+
+| CLI-002
+| Watch re-renders on file change
+| US-001: Criterion 2
+
+| CLI-003
+| Watch prints re-render message with path
+| US-001: Criterion 3
+
+| CLI-004
+| Watch monitors directory of .adoc files
+| US-001: Criterion 4
+
+| CLI-005
+| Watch runs continuously until terminated
+| US-001: Criterion 5
+
+| CLI-006
+| Watch continues after re-render failure
+| US-001: Criterion 6
+
+| CLI-007
+| Watch accepts --output flag
+| US-001: Criterion 7
+
+| CLI-008
+| Validate parses without producing PDF
+| US-002: Criterion 1
+
+| CLI-009
+| Validate exits 0 on success
+| US-002: Criterion 2
+
+| CLI-010
+| Validate exits non-zero on errors
+| US-002: Criterion 3
+
+| CLI-011
+| Validate checks Mermaid syntax
+| US-002: Criterion 4
+
+| CLI-012
+| Validate checks source block languages
+| US-002: Criterion 5
+
+| CLI-013
+| Validate file-not-found error
+| US-002: Criterion 6
+
+| CLI-014
+| Validate runs without browser
+| US-002: Criterion 7
+
+| CLI-015
+| Info prints document attributes
+| US-003: Criterion 1
+
+| CLI-016
+| Info shows title, author, revision, date
+| US-003: Criterion 2
+
+| CLI-017
+| Info shows user-defined attributes
+| US-003: Criterion 3
+
+| CLI-018
+| Info omits unset attributes
+| US-003: Criterion 4
+
+| CLI-019
+| Info file-not-found error
+| US-003: Criterion 5
+
+| CLI-020
+| Info runs without browser
+| US-003: Criterion 6
+
+| CLI-021
+| Four subcommands available
+| US-004: Criterion 1
+
+| CLI-022
+| --version displays version
+| US-004: Criterion 2
+
+| CLI-023
+| --help lists subcommands
+| US-004: Criterion 3
+
+| CLI-024
+| Subcommand --help shows usage
+| US-004: Criterion 4
+
+| CLI-025
+| --verbose and --quiet on all subcommands
+| US-004: Criterion 5
+
+| CLI-026
+| --verbose prints diagnostics
+| US-004: Criterion 6
+
+| CLI-027
+| --quiet suppresses non-error output
+| US-004: Criterion 7
+
+| CLI-028
+| --verbose + --quiet is an error
+| US-004: Criterion 8
+|===
