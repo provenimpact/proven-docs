@@ -8,6 +8,12 @@ import { mermaidJsPath } from './enrich.js';
  * mermaid.js is loaded via addScriptTag and diagrams are rendered to inline SVG
  * before printing.
  *
+ * If the HTML contains elements with `data-pdf-header` or `data-pdf-footer`
+ * attributes (injected by a custom template), they are extracted from the DOM
+ * and passed to Playwright's `headerTemplate` / `footerTemplate` options so
+ * that they render in the PDF margin area on every page — completely decoupled
+ * from body content.
+ *
  * @param {string} html - Complete HTML document string (enriched)
  * @param {string} outputPath - File path to write the PDF to
  * @returns {Promise<void>}
@@ -62,11 +68,61 @@ export async function printToPdf(html, outputPath) {
       });
     }
 
-    await page.pdf({
-      path: outputPath,
-      format: 'A4',
-      printBackground: true,
+    // Extract header/footer templates from the DOM (if present).
+    // These elements are removed from the body so they don't render in
+    // the content area — Playwright renders them in the margin zone.
+    const templates = await page.evaluate(() => {
+      const headerEl = document.querySelector('[data-pdf-header]');
+      const footerEl = document.querySelector('[data-pdf-footer]');
+
+      let headerHtml = null;
+      let footerHtml = null;
+
+      if (headerEl) {
+        headerHtml = headerEl.innerHTML;
+        headerEl.remove();
+      }
+      if (footerEl) {
+        footerHtml = footerEl.innerHTML;
+        footerEl.remove();
+      }
+
+      return { headerHtml, footerHtml };
     });
+
+    // Build PDF options
+    const pdfOptions = {
+      path: outputPath,
+      preferCSSPageSize: true,
+      printBackground: true,
+    };
+
+    if (templates.headerHtml || templates.footerHtml) {
+      pdfOptions.displayHeaderFooter = true;
+      // When using Playwright header/footer templates, Playwright must own
+      // the page layout.  Disable preferCSSPageSize so that @page CSS does
+      // not interfere with the margins, and use format + margin instead.
+      pdfOptions.preferCSSPageSize = false;
+      pdfOptions.format = 'A4';
+      pdfOptions.margin = {
+        top: '28mm',
+        bottom: '12mm',
+        left: '20mm',
+        right: '20mm',
+      };
+      // Playwright renders header/footer templates with font-size:0 by
+      // default, so we must set a base font-size.  -webkit-print-color-adjust
+      // ensures background colours render in the printed output.
+      const wrapStyle = 'width:100%; margin:0; padding:0; font-size:10pt; -webkit-print-color-adjust:exact;';
+      pdfOptions.headerTemplate = templates.headerHtml
+        ? `<div style="${wrapStyle}">${templates.headerHtml}</div>`
+        : '<span></span>';
+      pdfOptions.footerTemplate = templates.footerHtml
+        ? `<div style="${wrapStyle}">${templates.footerHtml}</div>`
+        : '<span></span>';
+    }
+
+    await page.pdf(pdfOptions);
   } finally {
     if (browser) {
       await browser.close();

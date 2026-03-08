@@ -1,0 +1,316 @@
+= Specification: Custom Themes
+:version: 1.0.0
+:source-stories-version: 1.0.0
+:last-updated: 2026-03-08
+:feature: custom-themes
+:prefix: THM
+:toc:
+
+== CSS Theme Application
+
+=== THM-001
+When the user provides a `--theme <path>` flag to the render command, the system shall apply the specified CSS file to the PDF output instead of the default stylesheet.
+
+Type:: Event-driven
+Source:: US-001: Criterion 1
+Verification:: Render a document with `--theme custom.css`. Confirm the PDF uses styles from `custom.css` and not the default Asciidoctor stylesheet.
+
+=== THM-002
+The system shall accept `.css` files as theme input.
+
+Type:: Ubiquitous
+Source:: US-001: Criterion 2
+Verification:: Provide a `.css` file as the `--theme` argument. Confirm the system accepts and applies it without error.
+
+=== THM-003
+When the user provides a `--theme` flag to the watch command, the system shall apply the specified CSS to every re-render.
+
+Type:: Event-driven
+Source:: US-001: Criterion 3
+Verification:: Start watch mode with `--theme custom.css`. Modify the watched AsciiDoc file. Confirm the re-rendered PDF uses the custom CSS.
+
+=== THM-004
+When no `--theme` flag is provided, the system shall use the default Asciidoctor stylesheet.
+
+Type:: Event-driven
+Source:: US-001: Criterion 6
+Verification:: Render a document without `--theme`. Confirm the PDF uses the default Asciidoctor styles.
+
+=== THM-005
+If the specified theme file does not exist, then the system shall print an error message identifying the missing file and exit with a non-zero code.
+
+Type:: Unwanted behavior
+Source:: US-001: Criterion 4
+Verification:: Run render with `--theme nonexistent.css`. Confirm a descriptive error is printed to stderr and the exit code is non-zero.
+
+=== THM-006
+If the specified theme file is not readable, then the system shall print an error message and exit with a non-zero code.
+
+Type:: Unwanted behavior
+Source:: US-001: Criterion 5
+Verification:: Run render with `--theme` pointing to a file with no read permission. Confirm an error is printed and the exit code is non-zero.
+
+== HTML Template Application
+
+=== THM-007
+When the user provides a `--template <path>` flag to the render command, the system shall inject the rendered AsciiDoc body into the template.
+
+Type:: Event-driven
+Source:: US-002: Criterion 1
+Verification:: Render a document with `--template wrapper.html`. Confirm the PDF output contains the template structure with the AsciiDoc body injected.
+
+=== THM-008
+The system shall support Mustache-style `{{attribute}}` placeholders in the template for AsciiDoc document attribute substitution.
+
+Type:: Ubiquitous
+Source:: US-002: Criterion 2
+Verification:: Create a template with `{{author}}` placeholders and a document with `:author: Jane`. Render and confirm the placeholder is replaced with "Jane" in the output.
+
+=== THM-009
+The system shall support a `{{{body}}}` placeholder (triple-braces, unescaped) in the template for injecting the rendered HTML content.
+
+Type:: Ubiquitous
+Source:: US-002: Criterion 3
+Verification:: Create a template with `{{{body}}}`. Render and confirm the rendered AsciiDoc HTML is injected at that location without escaping.
+
+=== THM-010
+When both `--template` and `--theme` flags are provided, the system shall apply both the custom template and the custom CSS.
+
+Type:: Event-driven
+Source:: US-002: Criterion 4
+Verification:: Render with both `--template` and `--theme`. Confirm the output uses the template structure and the custom CSS styles.
+
+=== THM-011
+If the specified template file does not exist, then the system shall print an error message identifying the missing file and exit with a non-zero code.
+
+Type:: Unwanted behavior
+Source:: US-002: Criterion 5
+Verification:: Run render with `--template nonexistent.html`. Confirm a descriptive error is printed to stderr and the exit code is non-zero.
+
+=== THM-012
+When no `--template` flag is provided, the system shall use the default HTML wrapper.
+
+Type:: Event-driven
+Source:: US-002: Criterion 6
+Verification:: Render a document without `--template`. Confirm the output uses the default document structure.
+
+== Document Metadata Exposure
+
+=== THM-013
+The system shall pass all AsciiDoc document attributes to the HTML template as substitution variables.
+
+Type:: Ubiquitous
+Source:: US-003: Criterion 1
+Verification:: Create a document with `:department: Engineering` and a template with `{{department}}`. Render and confirm "Engineering" appears in the output.
+
+=== THM-014
+The system shall expose AsciiDoc document attributes as `data-*` attributes on the root HTML element.
+
+Type:: Ubiquitous
+Source:: US-003: Criterion 2
+Verification:: Render a document with `:classification: CONFIDENTIAL`. Inspect the output HTML and confirm a `data-classification="CONFIDENTIAL"` attribute exists on the root element.
+
+=== THM-015
+When a template references an attribute that is not set in the document, the system shall substitute an empty string.
+
+Type:: Event-driven
+Source:: US-003: Criterion 3
+Verification:: Create a template with `{{nonexistent-attr}}`. Render a document that does not define that attribute. Confirm the placeholder is replaced with an empty string, not left as literal text.
+
+== Built-in Classified Template
+
+=== THM-016
+The system shall ship a built-in classified template selectable via `--template classified`.
+
+Type:: Ubiquitous
+Source:: US-004: Criterion 1
+Verification:: Run render with `--template classified`. Confirm the system resolves the built-in template without requiring a file path.
+
+=== THM-017
+When the classified template is used, the system shall render a colour-coded classification banner in the page header and footer based on the `:classification:` attribute value.
+
+Type:: Event-driven
+Source:: US-004: Criterion 2
+Verification:: Render a document with `:classification: CONFIDENTIAL` using `--template classified`. Confirm the PDF contains a visible banner in the header and footer area.
+
+=== THM-018
+When the classified template is used, the system shall render a cover page displaying the document title, author, classification, handling, distribution, document-id, and review-date.
+
+Type:: Event-driven
+Source:: US-004: Criterion 3
+Verification:: Render a document with all metadata attributes set using `--template classified`. Confirm a cover page is present with all expected fields.
+
+=== THM-019
+When the classified template is used and a classification attribute is not set, the system shall omit the classification banner rather than display an empty banner.
+
+Type:: Event-driven
+Source:: US-004: Criterion 4
+Verification:: Render a document without a `:classification:` attribute using `--template classified`. Confirm no empty banner element appears in the output.
+
+=== THM-020
+The classified template shall support at minimum the classification levels PUBLIC, INTERNAL, CONFIDENTIAL, and RESTRICTED.
+
+Type:: Ubiquitous
+Source:: US-004: Criterion 5
+Verification:: Render documents with each classification level using `--template classified`. Confirm each produces a distinct, appropriately styled banner.
+
+== Custom Fonts
+
+=== THM-021
+When a CSS theme references local font files via `@font-face`, the system shall resolve the font paths relative to the theme file's directory.
+
+Type:: Event-driven
+Source:: US-005: Criterion 1
+Verification:: Create a CSS theme in a subdirectory that references a woff2 font via a relative path. Render with `--theme`. Confirm the font is loaded and used in the PDF.
+
+=== THM-022
+The system shall support woff2 font files referenced from CSS themes.
+
+Type:: Ubiquitous
+Source:: US-005: Criterion 2
+Verification:: Reference a woff2 font in a CSS theme. Render and confirm the font is embedded in the PDF output.
+
+=== THM-023
+If a font file referenced in the CSS theme does not exist, then the system shall print a warning and continue rendering with fallback fonts.
+
+Type:: Unwanted behavior
+Source:: US-005: Criterion 3
+Verification:: Reference a nonexistent font file in a CSS theme. Render and confirm a warning is printed to stderr but the PDF is still produced.
+
+== Test Fixtures
+
+=== THM-024
+The test suite shall include fixture AsciiDoc files covering: plain text, Mermaid diagrams, syntax-highlighted code blocks, include directives, and document metadata attributes.
+
+Type:: Ubiquitous
+Source:: US-006: Criterion 1
+Verification:: Inspect the test fixtures directory. Confirm fixture files exist for each content type listed.
+
+=== THM-025
+The test fixture files shall be reusable across multiple test files.
+
+Type:: Ubiquitous
+Source:: US-006: Criterion 2
+Verification:: Confirm that at least two different test files import and use the same fixture file.
+
+=== THM-026
+When a fixture file includes metadata attributes, the test shall verify that those attributes are accessible in the rendered output.
+
+Type:: Event-driven
+Source:: US-006: Criterion 3
+Verification:: Run tests that use a metadata fixture. Confirm assertions check that document attributes appear in the rendered HTML or PDF output.
+
+== Traceability
+
+[cols="1,2,2", options="header"]
+|===
+| Requirement ID | Requirement Summary | Source
+
+| THM-001
+| Custom CSS applied via --theme flag
+| US-001: Criterion 1
+
+| THM-002
+| CSS file format accepted
+| US-001: Criterion 2
+
+| THM-003
+| Watch mode applies custom theme
+| US-001: Criterion 3
+
+| THM-004
+| Default stylesheet when no --theme
+| US-001: Criterion 6
+
+| THM-005
+| Error on missing theme file
+| US-001: Criterion 4
+
+| THM-006
+| Error on unreadable theme file
+| US-001: Criterion 5
+
+| THM-007
+| Template injection via --template flag
+| US-002: Criterion 1
+
+| THM-008
+| Mustache-style attribute substitution
+| US-002: Criterion 2
+
+| THM-009
+| Triple-brace body injection
+| US-002: Criterion 3
+
+| THM-010
+| Combined template and theme flags
+| US-002: Criterion 4
+
+| THM-011
+| Error on missing template file
+| US-002: Criterion 5
+
+| THM-012
+| Default HTML wrapper when no --template
+| US-002: Criterion 6
+
+| THM-013
+| Document attributes as template variables
+| US-003: Criterion 1
+
+| THM-014
+| Document attributes as data-* on root element
+| US-003: Criterion 2
+
+| THM-015
+| Empty string for unset attributes
+| US-003: Criterion 3
+
+| THM-016
+| Built-in classified template
+| US-004: Criterion 1
+
+| THM-017
+| Colour-coded classification banner
+| US-004: Criterion 2
+
+| THM-018
+| Cover page with metadata fields
+| US-004: Criterion 3
+
+| THM-019
+| Omit banner when classification not set
+| US-004: Criterion 4
+
+| THM-020
+| Support multiple classification levels
+| US-004: Criterion 5
+
+| THM-021
+| Font paths relative to theme directory
+| US-005: Criterion 1
+
+| THM-022
+| woff2 font support
+| US-005: Criterion 2
+
+| THM-023
+| Warning on missing font, continue rendering
+| US-005: Criterion 3
+
+| THM-024
+| Test fixtures for content types
+| US-006: Criterion 1
+
+| THM-025
+| Reusable fixtures across tests
+| US-006: Criterion 2
+
+| THM-026
+| Verify metadata in rendered output
+| US-006: Criterion 3
+|===
+
+NOTE: Offline operation is enforced by project constraint (Connectivity: "The tool must work fully offline"). Theme and template files must be local paths. Not duplicated here.
+
+NOTE: Licensing of any new dependencies is enforced by project constraint (Licensing: "Only permissive licenses permitted"). Not duplicated here.

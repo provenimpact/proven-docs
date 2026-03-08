@@ -1,5 +1,18 @@
 = State Transition Log
-:last-updated: 2026-03-07
+:last-updated: 2026-03-08
+
+== TRANSITION-005
+:date: 2026-03-08
+:intent: Custom HTML/CSS themes for PDF output with document metadata and classification attributes
+:type: Feature evolution
+:risk: High
+:features: custom-themes (new)
+:desired-state: Users can customize PDF appearance via CSS themes and HTML templates; AsciiDoc document attributes flow into templates as substitution variables; built-in classified template ships as an example
+:prior-state: PDFs use Asciidoctor default stylesheet with bundled Google Fonts; no theming, no template support, no metadata-driven headers/footers
+:capabilities-invoked: needs-stories, needs-spec, needs-design, needs-tasks, needs-tests, needs-implementation
+:constraints-checked: Licensing (pass -- no new dependencies, custom template engine is inline code), Connectivity (pass -- theme and template files are local paths, no network requests)
+:result: Achieved
+:artifacts-modified: docs/features/custom-themes/user-stories.adoc (v1.0.0), docs/features/custom-themes/spec.adoc (v1.0.0), docs/features/custom-themes/design.adoc (v1.0.0), docs/features/custom-themes/tasks.adoc (v1.0.0), src/render.js (modified -- returns attributes), src/theme.js (new), src/commands/render.js (modified -- theme/template flags), src/commands/watch.js (modified -- theme/template flags), src/commands/shared.js (modified -- validateThemeFlags), assets/templates/classified/template.html (new), assets/templates/classified/theme.css (new), tests/fixtures/ (new -- 6 fixture files), tests/features/custom-themes/theme-engine.test.js (new), tests/features/custom-themes/classified.test.js (new), tests/features/adoc-to-pdf/render.test.js (updated)
 
 == TRANSITION-004
 :date: 2026-03-07

@@ -53,7 +53,8 @@ function buildFontFaceCss() {
 const fontFaceCss = buildFontFaceCss();
 
 /**
- * Render AsciiDoc source text to a standalone HTML document.
+ * Render AsciiDoc source text to a standalone HTML document and extract
+ * document attributes.
  *
  * The Asciidoctor default stylesheet references Google Fonts via an external
  * <link> tag. This breaks headless browser PDF printing because the fonts
@@ -65,7 +66,8 @@ const fontFaceCss = buildFontFaceCss();
  * @param {string} [baseDir] - Base directory for resolving include directives.
  *   When provided, include:: paths are resolved relative to this directory.
  *   When omitted, Asciidoctor defaults to the process working directory.
- * @returns {string} Complete HTML document string
+ * @returns {{ html: string, attributes: Record<string, string> }}
+ *   Complete HTML document string and all document attributes.
  */
 export function renderToHtml(source, baseDir) {
   const options = {
@@ -75,7 +77,16 @@ export function renderToHtml(source, baseDir) {
   if (baseDir) {
     options.base_dir = baseDir;
   }
-  let html = asciidoctor.convert(source, options);
+
+  // Use load() + convert() to access document attributes
+  const doc = asciidoctor.load(source, options);
+  const attributes = doc.getAttributes();
+  let html = doc.convert();
+
+  // load() with standalone:true followed by convert() produces the body only.
+  // We need the full standalone HTML document, so re-convert with the
+  // processor directly to get the complete output including <html>/<head>.
+  html = asciidoctor.convert(source, options);
 
   // Replace external Google Fonts link with inline font-face declarations
   html = html.replace(
@@ -83,5 +94,5 @@ export function renderToHtml(source, baseDir) {
     `<style>${fontFaceCss}</style>`,
   );
 
-  return html;
+  return { html, attributes };
 }

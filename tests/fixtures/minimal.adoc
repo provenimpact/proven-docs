@@ -1,0 +1,12 @@
+= Minimal Document
+:author: Test Author
+
+This is a minimal AsciiDoc document for testing.
+
+== Section One
+
+A simple paragraph with some *bold* and _italic_ text.
+
+== Section Two
+
+Another paragraph for layout verification.

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{title}}</title>
+<style>{{{theme-css}}}</style>
+</head>
+<body data-classification="{{classification}}" data-handling="{{handling}}" data-distribution="{{distribution}}" data-document-id="{{document-id}}" data-review-date="{{review-date}}" data-department="{{department}}" data-retention="{{retention}}">
+
+<!--
+  PDF header: rendered by Playwright in the top margin area on every page.
+  All styles MUST be inline — Playwright's headerTemplate has no access
+  to the page stylesheet.  The element is removed from the body before
+  printing and passed to page.pdf({ headerTemplate }).
+-->
+<div data-pdf-header>
+  <div style="width:calc(100% - 40mm); margin:0 20mm; text-align:center; font-family:Arial,Helvetica,sans-serif; font-size:10pt; font-weight:bold; letter-spacing:0.1em; padding:3px 0; background-color:{{banner-bg}}; color:{{banner-fg}};">{{classification}}</div>
+  <table style="width:calc(100% - 40mm); margin:0 20mm; border-collapse:collapse; font-family:Arial,Helvetica,sans-serif; font-size:7.5pt; border-bottom:1px solid #999;">
+    <tr>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; font-weight:bold; color:#555; width:11%; white-space:nowrap; background:#f5f5f5;">Document</td>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; color:#1a1a1a; width:39%;">{{title}}</td>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; font-weight:bold; color:#555; width:11%; white-space:nowrap; background:#f5f5f5;">ID</td>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; color:#1a1a1a; width:39%;">{{document-id}}</td>
+    </tr>
+    <tr>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; font-weight:bold; color:#555; white-space:nowrap; background:#f5f5f5;">Author</td>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; color:#1a1a1a;">{{author}}</td>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; font-weight:bold; color:#555; white-space:nowrap; background:#f5f5f5;">Department</td>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; color:#1a1a1a;">{{department}}</td>
+    </tr>
+    <tr>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; font-weight:bold; color:#555; white-space:nowrap; background:#f5f5f5;">Classification</td>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; font-weight:bold; text-transform:uppercase; color:{{banner-bg}};">{{classification}}</td>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; font-weight:bold; color:#555; white-space:nowrap; background:#f5f5f5;">Review date</td>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; color:#1a1a1a;">{{review-date}}</td>
+    </tr>
+  </table>
+</div>
+
+<!--
+  PDF footer: rendered by Playwright in the bottom margin area on every page.
+-->
+<div data-pdf-footer>
+  <div style="width:calc(100% - 40mm); margin:0 20mm; display:flex; justify-content:space-between; font-family:Arial,Helvetica,sans-serif; font-size:8pt; font-weight:bold; letter-spacing:0.1em; padding:3px 0; box-sizing:border-box; background-color:{{banner-bg}}; color:{{banner-fg}};">
+    <span>{{classification}}</span>
+    <span style="font-weight:normal; letter-spacing:normal;">{{document-id}}</span>
+  </div>
+</div>
+
+<!-- Cover page -->
+<div class="cover-page">
+  <div class="cover-title">{{title}}</div>
+  <div class="cover-meta">
+    <table class="cover-meta-table">
+      <tr><td class="meta-label">Author</td><td class="meta-value">{{author}}</td></tr>
+      <tr><td class="meta-label">Classification</td><td class="meta-value">{{classification}}</td></tr>
+      <tr><td class="meta-label">Handling</td><td class="meta-value">{{handling}}</td></tr>
+      <tr><td class="meta-label">Distribution</td><td class="meta-value">{{distribution}}</td></tr>
+      <tr><td class="meta-label">Document ID</td><td class="meta-value">{{document-id}}</td></tr>
+      <tr><td class="meta-label">Review Date</td><td class="meta-value">{{review-date}}</td></tr>
+      <tr><td class="meta-label">Department</td><td class="meta-value">{{department}}</td></tr>
+      <tr><td class="meta-label">Retention</td><td class="meta-value">{{retention}}</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Document body -->
+<div class="document-body">
+  {{{body}}}
+</div>
+
+</body>
+</html>

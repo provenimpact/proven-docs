@@ -1,0 +1,6 @@
+= Document with Includes
+:author: Test Author
+
+This document uses include directives.
+
+include::chapter.adoc[]

@@ -1,0 +1,81 @@
+= Quarterly Risk Assessment
+:author: Jane Smith
+:classification: CONFIDENTIAL
+:handling: INTERNAL ONLY
+:distribution: Board of Directors
+:retention: 5 years
+:document-id: RISK-2026-Q1
+:review-date: 2026-06-30
+:department: Risk & Compliance
+
+== Executive Summary
+
+This document contains the quarterly risk assessment for the organisation.
+It is rendered using the built-in `classified` template, which adds:
+
+* Classification banners on every page (header and footer)
+* A running metadata header table
+* A cover page with document metadata
+
+== Risk Analysis
+
+The following areas were assessed during the review period.
+
+=== Operational Risk
+
+Operational processes have been reviewed against industry benchmarks.
+Key performance indicators remain within acceptable thresholds.
+
+=== Compliance Risk
+
+[source,mermaid]
+----
+flowchart TD
+    A[Regulatory Change] --> B{Impact Assessment}
+    B -->|High| C[Immediate Action]
+    B -->|Medium| D[Scheduled Review]
+    B -->|Low| E[Monitor]
+    C --> F[Update Controls]
+    D --> F
+----
+
+=== Technology Risk
+
+Systems uptime exceeded 99.9% during the quarter.
+Patch compliance is at 97% across all production environments.
+
+[source,python]
+----
+# Risk score calculation
+def calculate_risk(likelihood, impact):
+    """Return a weighted risk score."""
+    return likelihood * impact * 0.7 + impact * 0.3
+----
+
+== Recommendations
+
+. Increase monitoring frequency for high-risk suppliers
+. Update business continuity plans by Q2
+. Schedule penetration testing for customer-facing systems
+
+== Appendix
+
+|===
+| Risk Category | Score | Trend
+
+| Operational
+| 3.2
+| Stable
+
+| Compliance
+| 2.8
+| Improving
+
+| Technology
+| 2.1
+| Improving
+
+| Financial
+| 3.5
+| Watch
+|===

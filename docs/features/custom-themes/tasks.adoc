@@ -1,0 +1,130 @@
+= Implementation Tasks: Custom Themes
+:version: 1.0.0
+:status: Implemented
+:source-design-version: 1.0.0
+:source-stories-version: 1.0.0
+:source-spec-version: 1.0.0
+:last-updated: 2026-03-08
+:feature: custom-themes
+:toc:
+
+== Overview
+
+Custom theme support for PDF output: CSS theme override, HTML template wrapping with Mustache-style attribute substitution, document metadata exposure as data attributes, a built-in classified template, and shared test fixtures. 4 phases, 10 tasks.
+
+== Phase 1: Foundation — Test Fixtures and Renderer Changes
+
+Set up shared test fixtures and modify the renderer to expose document attributes alongside HTML output.
+
+* [x] TASK-001: Create shared test fixture AsciiDoc files [parallel]
++
+Components:: Test fixtures (`tests/fixtures/`)
+Stories:: US-006
+Specs:: THM-024, THM-025
+Description:: Create `tests/fixtures/` directory with: `minimal.adoc` (plain text), `with-mermaid.adoc` (Mermaid diagrams), `with-code.adoc` (syntax-highlighted code blocks), `with-includes/main.adoc` + `with-includes/chapter.adoc` (include directives), `with-metadata.adoc` (all conventional metadata attributes: classification, handling, distribution, retention, document-id, review-date, department).
+
+* [x] TASK-002: Modify `src/render.js` to return document attributes [parallel]
++
+Components:: AsciiDoc Renderer (`src/render.js`)
+Stories:: US-003
+Specs:: THM-013
+Description:: Change `renderToHtml()` to use `asciidoctor.load()` + `document.convert()` instead of `asciidoctor.convert()`. Return `{ html, attributes }` where `attributes` is the object from `document.getAttributes()`. Update all callers (`src/commands/render.js`, `src/commands/watch.js`) to destructure the new return type. Ensure existing tests still pass (the HTML output is identical).
+
+== Phase 2: Core — Theme Engine
+
+Implement the theme engine module that applies CSS overrides, template wrapping, and metadata injection.
+
+* [x] TASK-003: Implement `src/theme.js` — data attribute injection [sequential]
++
+Components:: Theme Engine (`src/theme.js`)
+Stories:: US-003
+Specs:: THM-014
+Description:: Create `src/theme.js` with `applyTheme(html, attributes, options)`. Start with Step 1: inject `data-*` attributes on the `<body>` tag for user-defined document attributes. Sanitise attribute names (lowercase, hyphens). Filter out internal Asciidoctor attributes (those starting with common internal prefixes like `doctype`, `outfilesuffix`, `filetype`, `backend`, etc.).
+
+* [x] TASK-004: Implement CSS theme replacement [sequential]
++
+Components:: Theme Engine (`src/theme.js`)
+Stories:: US-001, US-005
+Specs:: THM-001, THM-002, THM-021, THM-022, THM-023
+Description:: Add Step 2 to `applyTheme()`: when `themePath` is provided, read the CSS file, resolve relative `url()` font references to base64 data URIs (relative to the CSS file's directory), and replace the default Asciidoctor `<style>` block in `<head>`. Preserve the highlight.js CSS block. Log a warning to stderr for missing font files and continue rendering.
+
+* [x] TASK-005: Implement HTML template application [sequential]
++
+Components:: Theme Engine (`src/theme.js`)
+Stories:: US-002, US-003
+Specs:: THM-007, THM-008, THM-009, THM-010, THM-013, THM-015
+Description:: Add Step 3 to `applyTheme()`: when `templatePath` is provided, resolve the template (built-in name or file path), read it, substitute `{{attr}}` with HTML-escaped values, substitute `{{{attr}}}` and `{{{body}}}` with raw values, extract the `<body>` content from the enriched HTML for injection. Unset attributes become empty strings.
+
+== Phase 3: Integration — CLI Flags and Built-in Template
+
+Wire the theme engine into the CLI commands and ship the classified template.
+
+* [x] TASK-006: Add `--theme` and `--template` flags to render command [parallel]
++
+Components:: Render Command (`src/commands/render.js`)
+Stories:: US-001, US-002
+Specs:: THM-001, THM-004, THM-005, THM-006, THM-007, THM-010, THM-011, THM-012
+Description:: Add `--theme <path>` and `--template <path>` options to the render command. Validate files exist and are readable before starting the pipeline. Insert `applyTheme()` call after `enrichHtml()` and before `printToPdf()`. Pass `{ themePath, templatePath }` options.
+
+* [x] TASK-007: Add `--theme` and `--template` flags to watch command [parallel]
++
+Components:: Watch Command (`src/commands/watch.js`)
+Stories:: US-001
+Specs:: THM-003
+Description:: Add `--theme <path>` and `--template <path>` options to the watch command. Pass theme/template options through to each render cycle. Theme and template files are re-read on each render (not cached).
+
+* [x] TASK-008: Create built-in classified template [parallel]
++
+Components:: Built-in template assets (`assets/templates/classified/`)
+Stories:: US-004
+Specs:: THM-016, THM-017, THM-018, THM-019, THM-020
+Description:: Create `assets/templates/classified/template.html` with: classification banner (header/footer), cover page with metadata fields (`{{title}}`, `{{author}}`, `{{classification}}`, `{{handling}}`, `{{distribution}}`, `{{document-id}}`, `{{review-date}}`, `{{department}}`), and `{{{body}}}` placeholder. Create `assets/templates/classified/theme.css` with colour-coded classification levels (PUBLIC green, INTERNAL amber, CONFIDENTIAL red, RESTRICTED dark red), cover page layout, fixed header/footer positioning, and CSS to hide banner when classification is not set. Add built-in template resolution logic in `applyTheme()`.
+
+== Phase 4: Tests
+
+Write integration tests covering theme application, template rendering, metadata exposure, and the classified template.
+
+* [x] TASK-009: Write tests for theme engine and CLI integration [parallel]
++
+Components:: Test suites (`tests/features/custom-themes/`)
+Stories:: US-001, US-002, US-003, US-005, US-006
+Specs:: THM-001 through THM-015, THM-021 through THM-026
+Description:: Write integration tests covering: CSS theme application (custom CSS in output, default when no flag), HTML template application (body injection, attribute substitution, unset attributes), data attribute injection on body element, combined `--theme` + `--template`, error cases (missing/unreadable files), font path resolution and missing font warnings, metadata attributes in rendered output. Use shared fixtures from `tests/fixtures/`.
+
+* [x] TASK-010: Write tests for built-in classified template [parallel]
++
+Components:: Test suites (`tests/features/custom-themes/`)
+Stories:: US-004
+Specs:: THM-016 through THM-020
+Description:: Write integration tests covering: `--template classified` resolution, classification banner rendering for each level (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED), cover page with metadata fields, banner omission when classification is not set, colour differentiation between levels.
+
+== Traceability
+
+[cols="1,2,2", options="header"]
+|===
+| Story | Spec IDs | Tasks
+
+| US-001: Apply a Custom CSS Theme
+| THM-001, THM-002, THM-003, THM-004, THM-005, THM-006
+| TASK-004, TASK-006, TASK-007, TASK-009
+
+| US-002: Use a Custom HTML Template
+| THM-007, THM-008, THM-009, THM-010, THM-011, THM-012
+| TASK-005, TASK-006, TASK-009
+
+| US-003: Surface Document Metadata in Templates
+| THM-013, THM-014, THM-015
+| TASK-002, TASK-003, TASK-005, TASK-009
+
+| US-004: Built-in Classified Document Template
+| THM-016, THM-017, THM-018, THM-019, THM-020
+| TASK-008, TASK-010
+
+| US-005: Custom Fonts in Themes
+| THM-021, THM-022, THM-023
+| TASK-004, TASK-009
+
+| US-006: Test Fixtures for Theme Verification
+| THM-024, THM-025, THM-026
+| TASK-001, TASK-009
+|===
