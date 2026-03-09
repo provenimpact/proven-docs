@@ -16,7 +16,7 @@
     "chokidar": "^5.0.0",
     "commander": "^14.0.3",
     "highlight.js": "^11.11.1",
-    "mermaid": "^11.12.3",
+    "mermaid": "^11.13.0",
     "playwright": "^1.58.2"
   },
   "devDependencies": {
