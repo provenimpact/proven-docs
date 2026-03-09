@@ -1,0 +1,13 @@
+{
+	"name": "proven-docs",
+	"image": "mcr.microsoft.com/devcontainers/typescript-node:4.0.6-24-bookworm",
+	"postCreateCommand": "npm ci && npx playwright install --with-deps chromium",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"asciidoctor.asciidoctor-vscode",
+				"bierner.markdown-mermaid"
+			]
+		}
+	}
+}
