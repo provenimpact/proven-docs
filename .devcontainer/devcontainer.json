@@ -1,7 +1,7 @@
 {
 	"name": "proven-docs",
-	"image": "mcr.microsoft.com/devcontainers/typescript-node:4-24-bookworm",
-	"postCreateCommand": "npm ci && npx playwright install --with-deps chromium",
+	"image": "mcr.microsoft.com/devcontainers/base:bookworm",
+	"postCreateCommand": ".devcontainer/postCreateCommand.sh",
 	"customizations": {
 		"vscode": {
 			"extensions": [
