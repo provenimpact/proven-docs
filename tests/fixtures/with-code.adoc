@@ -1,0 +1,21 @@
+= Code Blocks
+:author: Test Author
+
+A document with syntax-highlighted code blocks.
+
+== JavaScript Example
+
+[source,javascript]
+----
+function greet(name) {
+  return `Hello, ${name}!`;
+}
+----
+
+== Python Example
+
+[source,python]
+----
+def greet(name):
+    return f"Hello, {name}!"
+----

@@ -1,0 +1,5 @@
+== Included Chapter
+
+This content comes from an included file.
+
+With a second paragraph for good measure.

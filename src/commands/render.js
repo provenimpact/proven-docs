@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { renderToHtml } from '../render.js';
 import { enrichHtml } from '../enrich.js';
+import { applyTheme } from '../theme.js';
 import { printToPdf } from '../print.js';
-import { validateOutputFlags } from './shared.js';
+import { validateOutputFlags, validateThemeFlags } from './shared.js';
 
 /**
  * Register the render subcommand on the given Commander program.
@@ -16,6 +17,8 @@ export function registerRenderCommand(program) {
     .description('Render an AsciiDoc file to PDF')
     .argument('<input>', 'Path to the .adoc file to render')
     .option('-o, --output <path>', 'Output PDF file path')
+    .option('--theme <path>', 'Custom CSS theme file')
+    .option('--template <path>', 'Custom HTML template file or built-in name')
     .option('--verbose', 'Print additional diagnostic information')
     .option('--quiet', 'Suppress all non-error output')
     .action(async (input, options) => {
@@ -39,6 +42,9 @@ export function registerRenderCommand(program) {
           process.exit(1);
         }
 
+        // Validate theme and template files if provided
+        const themeOptions = validateThemeFlags(options);
+
         // Read the AsciiDoc source
         if (verbose) process.stderr.write(`Reading ${inputPath}\n`);
         const source = fs.readFileSync(inputPath, 'utf-8');
@@ -47,8 +53,9 @@ export function registerRenderCommand(program) {
         if (verbose) process.stderr.write('Parsing AsciiDoc...\n');
         const baseDir = path.dirname(inputPath);
         let html;
+        let attributes;
         try {
-          html = renderToHtml(source, baseDir);
+          ({ html, attributes } = renderToHtml(source, baseDir));
         } catch (err) {
           process.stderr.write(`Error: AsciiDoc rendering failed: ${err.message}\n`);
           process.exit(1);
@@ -57,6 +64,10 @@ export function registerRenderCommand(program) {
         // Enrich HTML with mermaid diagrams and syntax highlighting
         if (verbose) process.stderr.write('Enriching HTML...\n');
         html = enrichHtml(html);
+
+        // Apply theme (CSS override, template, data attributes)
+        if (verbose) process.stderr.write('Applying theme...\n');
+        html = applyTheme(html, attributes, themeOptions);
 
         // Resolve output path
         const outputPath = options.output

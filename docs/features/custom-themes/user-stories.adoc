@@ -1,0 +1,80 @@
+= User Stories: Custom Themes
+:version: 1.0.0
+:last-updated: 2026-03-08
+:feature: custom-themes
+:toc:
+
+== US-001: Apply a Custom CSS Theme
+As a documentation author,
+I want to provide my own CSS stylesheet when rendering a PDF,
+so that the output matches my organisation's branding (colours, typography, layout).
+
+Acceptance Criteria:
+
+* [ ] When the user provides a `--theme <path>` flag to the render command, the system shall apply the specified CSS file to the PDF output instead of the default stylesheet.
+* [ ] The system shall support `.css` files as theme input.
+* [ ] When the user provides a `--theme` flag to the watch command, the system shall apply the specified CSS to every re-render.
+* [ ] If the specified theme file does not exist, then the system shall print an error message and exit with a non-zero code.
+* [ ] If the specified theme file is not readable, then the system shall print an error message and exit with a non-zero code.
+* [ ] When no `--theme` flag is provided, the system shall use the default Asciidoctor stylesheet.
+
+== US-002: Use a Custom HTML Template
+As a documentation author,
+I want to wrap the rendered AsciiDoc content in a custom HTML template,
+so that I can control the overall document structure, including cover pages, headers, footers, and page numbering.
+
+Acceptance Criteria:
+
+* [ ] When the user provides a `--template <path>` flag to the render command, the system shall inject the rendered AsciiDoc body into the template.
+* [ ] The system shall support Mustache-style `{{attribute}}` placeholders in the template for AsciiDoc document attribute substitution.
+* [ ] The system shall support a `{{{body}}}` placeholder (triple-braces, unescaped) in the template for injecting the rendered HTML content.
+* [ ] When both `--template` and `--theme` flags are provided, the system shall apply both the custom template and the custom CSS.
+* [ ] If the specified template file does not exist, then the system shall print an error message and exit with a non-zero code.
+* [ ] When no `--template` flag is provided, the system shall use the default HTML wrapper.
+
+== US-003: Surface Document Metadata in Templates
+As a compliance officer,
+I want AsciiDoc document attributes (classification, handling, distribution, document-id, etc.) to be available in HTML templates and CSS,
+so that regulated documents display the correct metadata on every page.
+
+Acceptance Criteria:
+
+* [ ] The system shall pass all AsciiDoc document attributes to the HTML template as substitution variables.
+* [ ] The system shall expose AsciiDoc document attributes as `data-*` attributes on the root HTML element, so that CSS `@page` rules and selectors can reference them.
+* [ ] When a template references an attribute that is not set in the document, the system shall substitute an empty string.
+* [ ] The system shall document a set of conventional attribute names (`:classification:`, `:handling:`, `:distribution:`, `:retention:`, `:document-id:`, `:review-date:`, `:department:`).
+
+== US-004: Built-in Classified Document Template
+As a compliance officer,
+I want a built-in "classified" template that renders classification banners, metadata fields, and a cover page,
+so that I can quickly produce documents that meet regulatory formatting requirements without creating a template from scratch.
+
+Acceptance Criteria:
+
+* [ ] The system shall ship a built-in classified template selectable via `--template classified`.
+* [ ] When the classified template is used, the system shall render a colour-coded classification banner in the page header and footer based on the `:classification:` attribute value.
+* [ ] When the classified template is used, the system shall render a cover page displaying the document title, author, classification, handling, distribution, document-id, and review-date.
+* [ ] When the classified template is used and a classification attribute is not set, the system shall omit the classification banner rather than display an empty banner.
+* [ ] The classified template shall support at minimum the classification levels PUBLIC, INTERNAL, CONFIDENTIAL, and RESTRICTED.
+
+== US-005: Custom Fonts in Themes
+As a documentation author,
+I want to reference my own font files (woff2) in my CSS theme,
+so that I can use my organisation's typography in PDF output.
+
+Acceptance Criteria:
+
+* [ ] When a CSS theme references local font files via `@font-face`, the system shall resolve the font paths relative to the theme file's directory.
+* [ ] The system shall support woff2 font files referenced from CSS themes.
+* [ ] If a referenced font file does not exist, then the system shall print a warning and continue rendering with fallback fonts.
+
+== US-006: Test Fixtures for Theme Verification
+As a developer,
+I want a set of AsciiDoc test fixture files covering different document scenarios,
+so that I can verify theme rendering across a variety of content types and metadata configurations.
+
+Acceptance Criteria:
+
+* [ ] The system shall include test fixture files in the test suite that cover: plain text, Mermaid diagrams, syntax-highlighted code blocks, include directives, and document metadata attributes.
+* [ ] The test fixtures shall be reusable across multiple test files.
+* [ ] When a fixture file includes metadata attributes (classification, handling, etc.), the test shall verify that those attributes are accessible in the rendered output.

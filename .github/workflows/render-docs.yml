@@ -7,29 +7,6 @@ on:
     branches: [main]
 
 jobs:
-  render-pdf:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - run: npx playwright install --with-deps chromium
-
-      - name: Render architecture.adoc to PDF
-        run: node bin/proven-docs.js render docs/architecture.adoc
-
-      - name: Upload PDF artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: architecture-pdf
-          path: docs/architecture.pdf
-
   test:
     runs-on: ubuntu-latest
     steps:
@@ -45,3 +22,35 @@ jobs:
       - run: npx playwright install --with-deps chromium
 
       - run: npm test
+
+  render-examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Install proven-docs globally
+        run: npm install -g .
+
+      - name: Render basic example
+        run: proven-docs render examples/basic.adoc --output examples/output/basic.pdf
+
+      - name: Render classified example
+        run: proven-docs render examples/classified-report.adoc --template classified --output examples/output/classified-report.pdf
+
+      - name: Render architecture doc
+        run: proven-docs render docs/architecture.adoc --output examples/output/architecture.pdf
+
+      - name: Upload example PDFs
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-pdfs
+          path: examples/output/

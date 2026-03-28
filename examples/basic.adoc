@@ -1,0 +1,40 @@
+= Project Status Report
+:author: Alex Johnson
+:revdate: 2026-03-08
+
+== Overview
+
+This is a basic example document rendered with **proven-docs**.
+It demonstrates standard AsciiDoc features including headings, paragraphs, lists, and inline formatting.
+
+== Highlights
+
+* The CLI converts `.adoc` files to print-ready PDFs
+* Mermaid diagrams render as embedded SVGs
+* Source code blocks get syntax highlighting
+* Everything runs offline — no network required
+
+== Architecture
+
+[source,mermaid]
+----
+flowchart LR
+    A[AsciiDoc] --> B[proven-docs]
+    B --> C[HTML]
+    C --> D[PDF]
+----
+
+== Code Sample
+
+[source,javascript]
+----
+import { readFile } from 'node:fs/promises';
+
+const source = await readFile('report.adoc', 'utf-8');
+console.log(`Loaded ${source.length} bytes`);
+----
+
+== Summary
+
+This document was generated automatically from AsciiDoc source.
+No manual formatting required.

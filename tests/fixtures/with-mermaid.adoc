@@ -1,0 +1,22 @@
+= Mermaid Diagrams
+:author: Test Author
+
+A document containing Mermaid diagram blocks.
+
+== Flow Diagram
+
+[source,mermaid]
+----
+flowchart LR
+    A[Start] --> B[Process]
+    B --> C[End]
+----
+
+== Sequence Diagram
+
+[source,mermaid]
+----
+sequenceDiagram
+    Alice->>Bob: Hello Bob
+    Bob-->>Alice: Hi Alice
+----

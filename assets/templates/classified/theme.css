@@ -1,0 +1,148 @@
+/* Classified document theme for proven-docs
+ *
+ * Header and footer elements (classification banners, running metadata table)
+ * are rendered via Playwright's headerTemplate / footerTemplate API.  They
+ * live in the PDF margin area and are completely decoupled from body content,
+ * so there is no overlap on any page.  All header/footer styling is inline
+ * in template.html because Playwright renders them in an isolated context
+ * without access to this stylesheet.
+ *
+ * This file styles only the body content: cover page and document body.
+ */
+
+@page {
+  size: A4;
+  /* Margins are controlled by Playwright's PDF options so that the
+   * headerTemplate / footerTemplate render in the margin zone while
+   * body content is inset consistently on every page. */
+}
+
+/* === Cover page === */
+.cover-page {
+  page-break-after: always;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 80vh;
+  padding: 20px 0 40px 0;
+}
+
+.cover-title {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 28pt;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 60px;
+  color: #1a1a1a;
+}
+
+.cover-meta {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.cover-meta-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11pt;
+}
+
+.cover-meta-table tr {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.cover-meta-table td {
+  padding: 8px 12px;
+  vertical-align: top;
+}
+
+.meta-label {
+  font-weight: bold;
+  color: #555555;
+  width: 140px;
+}
+
+.meta-value {
+  color: #1a1a1a;
+}
+
+/* Hide empty metadata rows */
+.meta-value:empty {
+  display: none;
+}
+
+tr:has(.meta-value:empty) {
+  display: none;
+}
+
+/* === Document body === */
+.document-body {
+  font-family: 'Noto Serif', Georgia, serif;
+  font-size: 11pt;
+  line-height: 1.6;
+  color: #1a1a1a;
+}
+
+.document-body #header {
+  margin-top: 0;
+}
+.document-body #header h1 {
+  margin-top: 0;
+}
+
+.document-body h1,
+.document-body h2,
+.document-body h3,
+.document-body h4,
+.document-body h5,
+.document-body h6 {
+  font-family: Arial, Helvetica, sans-serif;
+  color: #2c3e50;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.document-body h1 { font-size: 22pt; }
+.document-body h2 { font-size: 18pt; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
+.document-body h3 { font-size: 14pt; }
+.document-body h4 { font-size: 12pt; }
+
+.document-body p {
+  margin: 0.8em 0;
+}
+
+.document-body code {
+  font-family: 'Droid Sans Mono', 'Courier New', monospace;
+  font-size: 10pt;
+  background-color: #f5f5f5;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.document-body pre {
+  background-color: #f5f5f5;
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 10pt;
+  line-height: 1.4;
+}
+
+.document-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+
+.document-body th,
+.document-body td {
+  border: 1px solid #d0d0d0;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.document-body th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+}

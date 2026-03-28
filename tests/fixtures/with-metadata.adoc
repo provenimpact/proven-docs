@@ -1,0 +1,17 @@
+= Quarterly Risk Assessment
+:author: Jane Smith
+:classification: CONFIDENTIAL
+:handling: INTERNAL ONLY
+:distribution: Board of Directors
+:retention: 5 years
+:document-id: RISK-2026-Q1
+:review-date: 2026-06-30
+:department: Risk & Compliance
+
+== Executive Summary
+
+This document contains the quarterly risk assessment for the organisation.
+
+== Risk Analysis
+
+Details of identified risks and mitigation strategies.
