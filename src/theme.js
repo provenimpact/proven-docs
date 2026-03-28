@@ -1,9 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const templatesDir = path.join(__dirname, '..', 'assets', 'templates');
 
 /**
  * Internal Asciidoctor attribute names and prefixes to exclude from data-*
@@ -119,32 +115,6 @@ function resolveFontPaths(css, cssDir) {
 }
 
 /**
- * Resolve a template path: if it looks like a built-in name (no separator,
- * no file extension), resolve from assets/templates/<name>/template.html.
- * Otherwise treat as a file path.
- *
- * @param {string} templatePath - User-supplied template path or built-in name
- * @returns {{ resolvedPath: string, companionThemePath: string | null }}
- */
-function resolveTemplatePath(templatePath) {
-  const hasPathSep = templatePath.includes(path.sep) || templatePath.includes('/');
-  const hasExt = path.extname(templatePath) !== '';
-
-  if (!hasPathSep && !hasExt) {
-    // Built-in template name
-    const builtinDir = path.join(templatesDir, templatePath);
-    const resolvedPath = path.join(builtinDir, 'template.html');
-    const companionThemePath = path.join(builtinDir, 'theme.css');
-    return {
-      resolvedPath,
-      companionThemePath: fs.existsSync(companionThemePath) ? companionThemePath : null,
-    };
-  }
-
-  return { resolvedPath: path.resolve(templatePath), companionThemePath: null };
-}
-
-/**
  * Decode HTML entities back to raw characters.
  * Asciidoctor returns attribute values with HTML encoding (e.g., & → &amp;).
  * For template substitution, we need the raw values so that {{}} escaping
@@ -218,19 +188,6 @@ function extractBody(html) {
 export function applyTheme(html, attributes, options = {}) {
   const { themePath, templatePath } = options;
 
-  // Determine effective theme path (custom > companion > none)
-  let effectiveThemePath = themePath || null;
-  let resolvedTemplatePath = null;
-
-  if (templatePath) {
-    const resolved = resolveTemplatePath(templatePath);
-    resolvedTemplatePath = resolved.resolvedPath;
-    // Use companion theme only if no explicit --theme was provided
-    if (!themePath && resolved.companionThemePath) {
-      effectiveThemePath = resolved.companionThemePath;
-    }
-  }
-
   // --- Step 1: Inject data-* attributes on <body> ---
   // Note: Asciidoctor attribute values are already HTML-entity-encoded
   // (e.g., & becomes &amp;). We only need to escape double quotes for
@@ -246,15 +203,15 @@ export function applyTheme(html, attributes, options = {}) {
 
   // --- Step 2: Load CSS theme if provided ---
   let resolvedCss = null;
-  if (effectiveThemePath) {
-    const cssDir = path.dirname(effectiveThemePath);
-    resolvedCss = fs.readFileSync(effectiveThemePath, 'utf-8');
+  if (themePath) {
+    const cssDir = path.dirname(themePath);
+    resolvedCss = fs.readFileSync(themePath, 'utf-8');
     resolvedCss = resolveFontPaths(resolvedCss, cssDir);
   }
 
   // --- Step 3: Template application ---
-  if (resolvedTemplatePath) {
-    const templateContent = fs.readFileSync(resolvedTemplatePath, 'utf-8');
+  if (templatePath) {
+    const templateContent = fs.readFileSync(templatePath, 'utf-8');
     const body = extractBody(html);
 
     // Build substitution variables: all attributes + body + title + theme-css
@@ -270,18 +227,6 @@ export function applyTheme(html, attributes, options = {}) {
     if (resolvedCss) {
       vars['theme-css'] = resolvedCss;
     }
-
-    // Derive banner colours from classification level
-    const classificationColours = {
-      PUBLIC:       { bg: '#2e7d32', fg: '#ffffff' },
-      INTERNAL:     { bg: '#f57c00', fg: '#000000' },
-      CONFIDENTIAL: { bg: '#c62828', fg: '#ffffff' },
-      RESTRICTED:   { bg: '#4a148c', fg: '#ffffff' },
-    };
-    const rawClassification = decodeHtmlEntities(String(vars.classification || '')).toUpperCase();
-    const colours = classificationColours[rawClassification] || { bg: '#666666', fg: '#ffffff' };
-    vars['banner-bg'] = colours.bg;
-    vars['banner-fg'] = colours.fg;
 
     html = substitute(templateContent, vars);
   } else if (resolvedCss) {

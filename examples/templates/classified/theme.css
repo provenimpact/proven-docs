@@ -3,11 +3,13 @@
  * Header and footer elements (classification banners, running metadata table)
  * are rendered via Playwright's headerTemplate / footerTemplate API.  They
  * live in the PDF margin area and are completely decoupled from body content,
- * so there is no overlap on any page.  All header/footer styling is inline
- * in template.html because Playwright renders them in an isolated context
- * without access to this stylesheet.
+ * so there is no overlap on any page.  Header/footer classification colours
+ * are defined in local <style> blocks within template.html because Playwright
+ * renders them in an isolated context without access to this stylesheet.
  *
- * This file styles only the body content: cover page and document body.
+ * This file styles the body content: cover page, document body, and
+ * classification-level colour rules via [data-classification] attribute
+ * selectors on the <body> tag.
  */
 
 @page {
@@ -15,6 +17,21 @@
   /* Margins are controlled by Playwright's PDF options so that the
    * headerTemplate / footerTemplate render in the margin zone while
    * body content is inset consistently on every page. */
+}
+
+/* === Classification colour rules === */
+/* These target the data-classification attribute injected on <body>
+ * by the theme engine's data-* attribute injection step. */
+
+[data-classification="PUBLIC"]       { --classification-bg: #2e7d32; --classification-fg: #ffffff; }
+[data-classification="INTERNAL"]     { --classification-bg: #f57c00; --classification-fg: #000000; }
+[data-classification="CONFIDENTIAL"] { --classification-bg: #c62828; --classification-fg: #ffffff; }
+[data-classification="RESTRICTED"]   { --classification-bg: #4a148c; --classification-fg: #ffffff; }
+
+/* Hide classification banners when classification is absent or empty */
+body:not([data-classification]) .classification-banner,
+[data-classification=""] .classification-banner {
+  display: none;
 }
 
 /* === Cover page === */

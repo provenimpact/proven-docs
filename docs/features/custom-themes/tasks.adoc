@@ -1,102 +1,59 @@
 = Implementation Tasks: Custom Themes
-:version: 1.0.0
+:version: 2.0.0
 :status: Implemented
-:source-design-version: 1.0.0
-:source-stories-version: 1.0.0
-:source-spec-version: 1.0.0
-:last-updated: 2026-03-08
+:source-design-version: 1.1.0
+:source-stories-version: 1.1.0
+:source-spec-version: 1.1.0
+:last-updated: 2026-03-28
 :feature: custom-themes
 :toc:
 
 == Overview
 
-Custom theme support for PDF output: CSS theme override, HTML template wrapping with Mustache-style attribute substitution, document metadata exposure as data attributes, a built-in classified template, and shared test fixtures. 4 phases, 10 tasks.
+Refactor the classified template from a built-in to an example: move template files from `assets/templates/` to `examples/templates/`, remove built-in name resolution and classification colour logic from the theme engine, and move colour styling into the template CSS using `data-classification` attribute selectors. 2 phases, 5 tasks.
 
-== Phase 1: Foundation — Test Fixtures and Renderer Changes
+== Phase 1: Template Migration and Engine Simplification
 
-Set up shared test fixtures and modify the renderer to expose document attributes alongside HTML output.
+Move the classified template to `examples/` and update it for CSS-driven colours. In parallel, remove built-in resolution and colour logic from the theme engine and shared validation.
 
-* [x] TASK-001: Create shared test fixture AsciiDoc files [parallel]
+* [x] TASK-001: Move classified template to examples/ and add CSS colour selectors [parallel]
 +
-Components:: Test fixtures (`tests/fixtures/`)
-Stories:: US-006
-Specs:: THM-024, THM-025
-Description:: Create `tests/fixtures/` directory with: `minimal.adoc` (plain text), `with-mermaid.adoc` (Mermaid diagrams), `with-code.adoc` (syntax-highlighted code blocks), `with-includes/main.adoc` + `with-includes/chapter.adoc` (include directives), `with-metadata.adoc` (all conventional metadata attributes: classification, handling, distribution, retention, document-id, review-date, department).
+Components:: Example template files (`examples/templates/classified/`)
+Stories:: US-004
+Specs:: THM-016, THM-017, THM-019, THM-020
+Description:: Move `assets/templates/classified/` to `examples/templates/classified/`. In `template.html`: replace inline `{{banner-bg}}` and `{{banner-fg}}` references in the header banner, footer banner, and classification colour cell with CSS class-based styling that will be driven by `data-classification` attribute selectors. Remove the `background-color:{{banner-bg}}; color:{{banner-fg}}` inline styles from the `data-pdf-header` and `data-pdf-footer` div elements and the classification cell `color:{{banner-bg}}`. Instead, add CSS classes (e.g., `classification-banner`) that the theme.css will style. In `theme.css`: add `[data-classification]` attribute selector rules for each level — `[data-classification="PUBLIC"]` (bg: #2e7d32, fg: #ffffff), `[data-classification="INTERNAL"]` (bg: #f57c00, fg: #000000), `[data-classification="CONFIDENTIAL"]` (bg: #c62828, fg: #ffffff), `[data-classification="RESTRICTED"]` (bg: #4a148c, fg: #ffffff). Add a default/fallback rule. Add `body:not([data-classification]) .classification-banner, [data-classification=""] .classification-banner { display: none }` for banner hiding. Note: since header/footer elements use Playwright's headerTemplate (isolated context, no access to page stylesheet), the classification colours for header/footer inline styles must be handled differently — use `data-classification` on the body tag which is already set by the theme engine, and have the template HTML use CSS `<style>` blocks within the header/footer divs referencing the body's `data-classification`.
 
-* [x] TASK-002: Modify `src/render.js` to return document attributes [parallel]
-+
-Components:: AsciiDoc Renderer (`src/render.js`)
-Stories:: US-003
-Specs:: THM-013
-Description:: Change `renderToHtml()` to use `asciidoctor.load()` + `document.convert()` instead of `asciidoctor.convert()`. Return `{ html, attributes }` where `attributes` is the object from `document.getAttributes()`. Update all callers (`src/commands/render.js`, `src/commands/watch.js`) to destructure the new return type. Ensure existing tests still pass (the HTML output is identical).
-
-== Phase 2: Core — Theme Engine
-
-Implement the theme engine module that applies CSS overrides, template wrapping, and metadata injection.
-
-* [x] TASK-003: Implement `src/theme.js` — data attribute injection [sequential]
+* [x] TASK-002: Remove built-in template resolution from theme engine [parallel]
 +
 Components:: Theme Engine (`src/theme.js`)
-Stories:: US-003
-Specs:: THM-014
-Description:: Create `src/theme.js` with `applyTheme(html, attributes, options)`. Start with Step 1: inject `data-*` attributes on the `<body>` tag for user-defined document attributes. Sanitise attribute names (lowercase, hyphens). Filter out internal Asciidoctor attributes (those starting with common internal prefixes like `doctype`, `outfilesuffix`, `filetype`, `backend`, etc.).
+Stories:: US-004
+Specs:: THM-016
+Description:: Remove `templatesDir` constant (line 6), `resolveTemplatePath()` function (lines 129–145), and the `fileURLToPath` import (line 3, only used for `__dirname`). In `applyTheme()`: remove the `resolveTemplatePath()` call — `templatePath` is now always a resolved file path. Remove the companion theme logic (lines 225–232). Simplify to: `resolvedTemplatePath = templatePath`. Also remove the `classificationColours` map and `banner-bg`/`banner-fg` variable injection (lines 274–284). The `path` import is still needed for `resolveFontPaths`. The `{ fileURLToPath }` import from `node:url` and `const __dirname` line can be removed.
 
-* [x] TASK-004: Implement CSS theme replacement [sequential]
+* [x] TASK-003: Simplify template validation in shared.js [parallel]
 +
-Components:: Theme Engine (`src/theme.js`)
-Stories:: US-001, US-005
-Specs:: THM-001, THM-002, THM-021, THM-022, THM-023
-Description:: Add Step 2 to `applyTheme()`: when `themePath` is provided, read the CSS file, resolve relative `url()` font references to base64 data URIs (relative to the CSS file's directory), and replace the default Asciidoctor `<style>` block in `<head>`. Preserve the highlight.js CSS block. Log a warning to stderr for missing font files and continue rendering.
+Components:: Shared utilities (`src/commands/shared.js`)
+Stories:: US-002
+Specs:: THM-011
+Description:: In `validateThemeFlags()`: remove the built-in name bypass logic (lines 49–74). All `--template` values are now file paths — validate existence and readability the same way as `--theme`. Remove the `hasPathSep`/`hasExt` check and the "Built-in name — pass through" branch. Always resolve to absolute path and validate.
 
-* [x] TASK-005: Implement HTML template application [sequential]
+== Phase 2: Test Updates
+
+Update tests to use file paths instead of bare "classified" name, and verify CSS-driven colour logic.
+
+* [x] TASK-004: Update classified template integration tests [parallel]
 +
-Components:: Theme Engine (`src/theme.js`)
-Stories:: US-002, US-003
-Specs:: THM-007, THM-008, THM-009, THM-010, THM-013, THM-015
-Description:: Add Step 3 to `applyTheme()`: when `templatePath` is provided, resolve the template (built-in name or file path), read it, substitute `{{attr}}` with HTML-escaped values, substitute `{{{attr}}}` and `{{{body}}}` with raw values, extract the `<body>` content from the enriched HTML for injection. Unset attributes become empty strings.
-
-== Phase 3: Integration — CLI Flags and Built-in Template
-
-Wire the theme engine into the CLI commands and ship the classified template.
-
-* [x] TASK-006: Add `--theme` and `--template` flags to render command [parallel]
-+
-Components:: Render Command (`src/commands/render.js`)
-Stories:: US-001, US-002
-Specs:: THM-001, THM-004, THM-005, THM-006, THM-007, THM-010, THM-011, THM-012
-Description:: Add `--theme <path>` and `--template <path>` options to the render command. Validate files exist and are readable before starting the pipeline. Insert `applyTheme()` call after `enrichHtml()` and before `printToPdf()`. Pass `{ themePath, templatePath }` options.
-
-* [x] TASK-007: Add `--theme` and `--template` flags to watch command [parallel]
-+
-Components:: Watch Command (`src/commands/watch.js`)
-Stories:: US-001
-Specs:: THM-003
-Description:: Add `--theme <path>` and `--template <path>` options to the watch command. Pass theme/template options through to each render cycle. Theme and template files are re-read on each render (not cached).
-
-* [x] TASK-008: Create built-in classified template [parallel]
-+
-Components:: Built-in template assets (`assets/templates/classified/`)
+Components:: Test suites (`tests/features/custom-themes/classified.test.js`)
 Stories:: US-004
 Specs:: THM-016, THM-017, THM-018, THM-019, THM-020
-Description:: Create `assets/templates/classified/template.html` with: classification banner (header/footer), cover page with metadata fields (`{{title}}`, `{{author}}`, `{{classification}}`, `{{handling}}`, `{{distribution}}`, `{{document-id}}`, `{{review-date}}`, `{{department}}`), and `{{{body}}}` placeholder. Create `assets/templates/classified/theme.css` with colour-coded classification levels (PUBLIC green, INTERNAL amber, CONFIDENTIAL red, RESTRICTED dark red), cover page layout, fixed header/footer positioning, and CSS to hide banner when classification is not set. Add built-in template resolution logic in `applyTheme()`.
+Description:: Update all test cases: replace `templatePath: 'classified'` with the resolved file path to `examples/templates/classified/template.html`. Replace `'--template', 'classified'` CLI args with `'--template', path.resolve('examples/templates/classified/template.html')`. Update THM-016 test description from "Built-in classified template" to "Example classified template". Update THM-017 colour assertion: instead of checking for `background-color:#c62828` inline (which came from `{{banner-bg}}`), verify that the themed HTML contains the CSS attribute selector rules from theme.css. Update THM-019: remove assertion for fallback grey `#666666` (that was engine-injected) — instead verify that the CSS contains `display: none` rules for absent classification. Update THM-020: instead of checking inline `background-color:` per level, verify that the themed HTML includes the CSS rules with the expected colour values for each `[data-classification="LEVEL"]` selector. Also need to pass `--theme examples/templates/classified/theme.css` alongside `--template` in CLI tests since companion theme auto-loading is removed. Update file header comment to reference spec version 1.1.0.
 
-== Phase 4: Tests
-
-Write integration tests covering theme application, template rendering, metadata exposure, and the classified template.
-
-* [x] TASK-009: Write tests for theme engine and CLI integration [parallel]
+* [x] TASK-005: Verify no remaining built-in references in codebase [parallel]
 +
-Components:: Test suites (`tests/features/custom-themes/`)
-Stories:: US-001, US-002, US-003, US-005, US-006
-Specs:: THM-001 through THM-015, THM-021 through THM-026
-Description:: Write integration tests covering: CSS theme application (custom CSS in output, default when no flag), HTML template application (body injection, attribute substitution, unset attributes), data attribute injection on body element, combined `--theme` + `--template`, error cases (missing/unreadable files), font path resolution and missing font warnings, metadata attributes in rendered output. Use shared fixtures from `tests/fixtures/`.
-
-* [x] TASK-010: Write tests for built-in classified template [parallel]
-+
-Components:: Test suites (`tests/features/custom-themes/`)
+Components:: All source and test files
 Stories:: US-004
-Specs:: THM-016 through THM-020
-Description:: Write integration tests covering: `--template classified` resolution, classification banner rendering for each level (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED), cover page with metadata fields, banner omission when classification is not set, colour differentiation between levels.
+Specs:: THM-016
+Description:: Search codebase for any remaining references to `assets/templates`, `templatesDir`, `resolveTemplatePath`, `companionTheme`, `classificationColours`, `banner-bg`, `banner-fg`, or `--template classified` (bare name). Ensure none exist in source or test files. Verify the `assets/templates/` directory no longer exists. Verify `examples/templates/classified/` exists with both files.
 
 == Traceability
 
@@ -106,25 +63,25 @@ Description:: Write integration tests covering: `--template classified` resoluti
 
 | US-001: Apply a Custom CSS Theme
 | THM-001, THM-002, THM-003, THM-004, THM-005, THM-006
-| TASK-004, TASK-006, TASK-007, TASK-009
+| (no tasks — unchanged)
 
 | US-002: Use a Custom HTML Template
 | THM-007, THM-008, THM-009, THM-010, THM-011, THM-012
-| TASK-005, TASK-006, TASK-009
+| TASK-003
 
 | US-003: Surface Document Metadata in Templates
 | THM-013, THM-014, THM-015
-| TASK-002, TASK-003, TASK-005, TASK-009
+| (no tasks — unchanged)
 
-| US-004: Built-in Classified Document Template
+| US-004: Example Classified Document Template
 | THM-016, THM-017, THM-018, THM-019, THM-020
-| TASK-008, TASK-010
+| TASK-001, TASK-002, TASK-003, TASK-004, TASK-005
 
 | US-005: Custom Fonts in Themes
 | THM-021, THM-022, THM-023
-| TASK-004, TASK-009
+| (no tasks — unchanged)
 
 | US-006: Test Fixtures for Theme Verification
 | THM-024, THM-025, THM-026
-| TASK-001, TASK-009
+| (no tasks — unchanged)
 |===

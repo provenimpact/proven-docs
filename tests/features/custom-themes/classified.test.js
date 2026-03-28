@@ -1,13 +1,13 @@
 // Feature: custom-themes
-// Spec version: 1.0.0
+// Spec version: 1.1.0
 // Generated from: spec.adoc
 //
 // Spec coverage:
-//   THM-016: Built-in classified template
-//   THM-017: Colour-coded classification banner
+//   THM-016: Example classified template shipped at examples/templates/classified/
+//   THM-017: Colour-coded classification banner via CSS data-classification selectors
 //   THM-018: Cover page with metadata fields
 //   THM-019: Omit banner when classification not set
-//   THM-020: Support multiple classification levels
+//   THM-020: Support multiple classification levels, styling entirely in CSS
 //
 // Test level: Integration
 
@@ -21,6 +21,8 @@ import os from 'node:os';
 const execFileAsync = promisify(execFile);
 const CLI_PATH = path.resolve('bin/proven-docs.js');
 const FIXTURES_DIR = path.resolve('tests/fixtures');
+const CLASSIFIED_TEMPLATE = path.resolve('examples/templates/classified/template.html');
+const CLASSIFIED_THEME = path.resolve('examples/templates/classified/theme.css');
 
 function run(args, options = {}) {
   return execFileAsync('node', [CLI_PATH, ...args], {
@@ -42,16 +44,22 @@ afterAll(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-// --- THM-016: Built-in classified template ---
-describe('THM-016: Built-in classified template', () => {
-  it('should resolve --template classified as a built-in template', async () => {
+// --- THM-016: Example classified template ---
+describe('THM-016: Example classified template', () => {
+  it('should ship template.html and theme.css at examples/templates/classified/', () => {
+    expect(fs.existsSync(CLASSIFIED_TEMPLATE)).toBe(true);
+    expect(fs.existsSync(CLASSIFIED_THEME)).toBe(true);
+  });
+
+  it('should render a PDF when using the example template via file path', async () => {
     const inputFile = path.join(FIXTURES_DIR, 'with-metadata.adoc');
     const outputFile = path.join(tmpDir, 'classified-output.pdf');
 
     const result = await run([
       'render', inputFile,
       '--output', outputFile,
-      '--template', 'classified',
+      '--template', CLASSIFIED_TEMPLATE,
+      '--theme', CLASSIFIED_THEME,
     ]);
 
     expect(result.exitCode).toBe(0);
@@ -61,8 +69,8 @@ describe('THM-016: Built-in classified template', () => {
   });
 });
 
-// --- THM-017: Colour-coded classification banner ---
-describe('THM-017: Classification banner', () => {
+// --- THM-017: Colour-coded classification banner via CSS selectors ---
+describe('THM-017: Classification banner with CSS attribute selectors', () => {
   it('should render a classification banner when classification attribute is set', async () => {
     const { renderToHtml } = await import('../../../src/render.js');
     const { enrichHtml } = await import('../../../src/enrich.js');
@@ -72,15 +80,23 @@ describe('THM-017: Classification banner', () => {
     const baseDir = FIXTURES_DIR;
     const { html, attributes } = renderToHtml(source, baseDir);
     const enriched = enrichHtml(html);
-    const themed = applyTheme(enriched, attributes, { templatePath: 'classified' });
+    const themed = applyTheme(enriched, attributes, {
+      templatePath: CLASSIFIED_TEMPLATE,
+      themePath: CLASSIFIED_THEME,
+    });
 
-    // Should contain the classification text in the banner
+    // Should contain the classification text
     expect(themed).toContain('CONFIDENTIAL');
-    // Should have the header/footer template structure (Playwright headerTemplate approach)
+    // Should have the header/footer template structure
     expect(themed).toContain('data-pdf-header');
     expect(themed).toContain('data-pdf-footer');
-    // Banner should contain the classification-level background colour
-    expect(themed).toContain('background-color:#c62828');
+  });
+
+  it('should use CSS attribute selectors for banner colours, not engine-injected values', () => {
+    // Read the theme CSS directly and verify it uses [data-classification] selectors
+    const themeCss = fs.readFileSync(CLASSIFIED_THEME, 'utf-8');
+    expect(themeCss).toContain('[data-classification="CONFIDENTIAL"]');
+    expect(themeCss).toContain('#c62828');
   });
 });
 
@@ -95,7 +111,10 @@ describe('THM-018: Cover page with metadata fields', () => {
     const baseDir = FIXTURES_DIR;
     const { html, attributes } = renderToHtml(source, baseDir);
     const enriched = enrichHtml(html);
-    const themed = applyTheme(enriched, attributes, { templatePath: 'classified' });
+    const themed = applyTheme(enriched, attributes, {
+      templatePath: CLASSIFIED_TEMPLATE,
+      themePath: CLASSIFIED_THEME,
+    });
 
     // Cover page should contain metadata values
     expect(themed).toContain('Jane Smith');
@@ -110,7 +129,7 @@ describe('THM-018: Cover page with metadata fields', () => {
 
 // --- THM-019: Omit banner when classification not set ---
 describe('THM-019: Omit banner when classification not set', () => {
-  it('should include CSS that hides the banner when classification is absent', async () => {
+  it('should include CSS rules that hide the banner when classification is absent', async () => {
     const { renderToHtml } = await import('../../../src/render.js');
     const { enrichHtml } = await import('../../../src/enrich.js');
     const { applyTheme } = await import('../../../src/theme.js');
@@ -119,19 +138,30 @@ describe('THM-019: Omit banner when classification not set', () => {
     const source = '= Simple Document\n:author: Bob\n\nContent here.';
     const { html, attributes } = renderToHtml(source);
     const enriched = enrichHtml(html);
-    const themed = applyTheme(enriched, attributes, { templatePath: 'classified' });
+    const themed = applyTheme(enriched, attributes, {
+      templatePath: CLASSIFIED_TEMPLATE,
+      themePath: CLASSIFIED_THEME,
+    });
 
-    // When classification is absent, the banner text should be empty and
-    // the fallback grey colour (#666666) should be used
-    expect(themed).toContain('background-color:#666666');
+    // The themed HTML should contain CSS rules that hide the banner
+    // when data-classification is absent or empty
+    expect(themed).toContain('display: none');
     // The header/footer template structure should still be present
     expect(themed).toContain('data-pdf-header');
     expect(themed).toContain('data-pdf-footer');
   });
+
+  it('should have CSS rules for hiding banners when classification is absent', () => {
+    const themeCss = fs.readFileSync(CLASSIFIED_THEME, 'utf-8');
+    // CSS should hide banners when data-classification is empty or absent
+    expect(themeCss).toMatch(/body:not\(\[data-classification\]\)/);
+    expect(themeCss).toMatch(/\[data-classification=""\]/);
+    expect(themeCss).toContain('display: none');
+  });
 });
 
 // --- THM-020: Support multiple classification levels ---
-describe('THM-020: Multiple classification levels', () => {
+describe('THM-020: Multiple classification levels with CSS-only styling', () => {
   const levels = ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'];
 
   for (const level of levels) {
@@ -144,7 +174,8 @@ describe('THM-020: Multiple classification levels', () => {
       const result = await run([
         'render', inputFile,
         '--output', outputFile,
-        '--template', 'classified',
+        '--template', CLASSIFIED_TEMPLATE,
+        '--theme', CLASSIFIED_THEME,
       ]);
 
       expect(result.exitCode).toBe(0);
@@ -152,12 +183,10 @@ describe('THM-020: Multiple classification levels', () => {
     });
   }
 
-  it('should have distinct banner colours for each classification level', async () => {
-    const { renderToHtml } = await import('../../../src/render.js');
-    const { enrichHtml } = await import('../../../src/enrich.js');
-    const { applyTheme } = await import('../../../src/theme.js');
+  it('should have distinct CSS colour rules for each classification level', () => {
+    const themeCss = fs.readFileSync(CLASSIFIED_THEME, 'utf-8');
 
-    // Each level should produce a different background colour in the header
+    // Each level should have a [data-classification="LEVEL"] selector with a distinct colour
     const expectedColours = {
       PUBLIC: '#2e7d32',
       INTERNAL: '#f57c00',
@@ -165,13 +194,17 @@ describe('THM-020: Multiple classification levels', () => {
       RESTRICTED: '#4a148c',
     };
 
-    for (const level of levels) {
-      const source = `= Test\n:classification: ${level}\n\nContent.`;
-      const { html, attributes } = renderToHtml(source);
-      const enriched = enrichHtml(html);
-      const themed = applyTheme(enriched, attributes, { templatePath: 'classified' });
-
-      expect(themed).toContain(`background-color:${expectedColours[level]}`);
+    for (const [level, colour] of Object.entries(expectedColours)) {
+      expect(themeCss).toContain(`[data-classification="${level}"]`);
+      expect(themeCss).toContain(colour);
     }
+  });
+
+  it('should not contain any classification colour logic in the theme engine', async () => {
+    // Read the theme engine source and verify no classification colours
+    const themeSource = fs.readFileSync(path.resolve('src/theme.js'), 'utf-8');
+    expect(themeSource).not.toContain('classificationColours');
+    expect(themeSource).not.toContain('banner-bg');
+    expect(themeSource).not.toContain('banner-fg');
   });
 });
