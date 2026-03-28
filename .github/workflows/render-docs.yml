@@ -50,7 +50,7 @@ jobs:
         run: proven-docs render docs/architecture.adoc --output examples/output/architecture.pdf
 
       - name: Upload example PDFs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: example-pdfs
           path: examples/output/
