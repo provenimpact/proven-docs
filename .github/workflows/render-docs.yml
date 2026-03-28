@@ -44,7 +44,7 @@ jobs:
         run: proven-docs render examples/basic.adoc --output examples/output/basic.pdf
 
       - name: Render classified example
-        run: proven-docs render examples/classified-report.adoc --template classified --output examples/output/classified-report.pdf
+        run: proven-docs render examples/classified-report.adoc --template examples/templates/classified/template.html --theme examples/templates/classified/theme.css --output examples/output/classified-report.pdf
 
       - name: Render architecture doc
         run: proven-docs render docs/architecture.adoc --output examples/output/architecture.pdf

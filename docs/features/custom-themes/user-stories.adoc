@@ -1,6 +1,6 @@
 = User Stories: Custom Themes
-:version: 1.0.0
-:last-updated: 2026-03-08
+:version: 1.1.0
+:last-updated: 2026-03-28
 :feature: custom-themes
 :toc:
 
@@ -44,18 +44,18 @@ Acceptance Criteria:
 * [ ] When a template references an attribute that is not set in the document, the system shall substitute an empty string.
 * [ ] The system shall document a set of conventional attribute names (`:classification:`, `:handling:`, `:distribution:`, `:retention:`, `:document-id:`, `:review-date:`, `:department:`).
 
-== US-004: Built-in Classified Document Template
+== US-004: Example Classified Document Template
 As a compliance officer,
-I want a built-in "classified" template that renders classification banners, metadata fields, and a cover page,
-so that I can quickly produce documents that meet regulatory formatting requirements without creating a template from scratch.
+I want an example "classified" template shipped with the project that renders classification banners, metadata fields, and a cover page,
+so that I can quickly produce documents that meet regulatory formatting requirements by pointing `--template` at the example rather than creating a template from scratch.
 
 Acceptance Criteria:
 
-* [ ] The system shall ship a built-in classified template selectable via `--template classified`.
-* [ ] When the classified template is used, the system shall render a colour-coded classification banner in the page header and footer based on the `:classification:` attribute value.
-* [ ] When the classified template is used, the system shall render a cover page displaying the document title, author, classification, handling, distribution, document-id, and review-date.
-* [ ] When the classified template is used and a classification attribute is not set, the system shall omit the classification banner rather than display an empty banner.
-* [ ] The classified template shall support at minimum the classification levels PUBLIC, INTERNAL, CONFIDENTIAL, and RESTRICTED.
+* [ ] The project shall ship an example classified template at `examples/templates/classified/`.
+* [ ] When the example classified template is used via `--template <path>`, the template shall render a colour-coded classification banner in the page header and footer based on the `:classification:` attribute value, using CSS attribute selectors on the `data-classification` attribute.
+* [ ] When the example classified template is used, the template shall render a cover page displaying the document title, author, classification, handling, distribution, document-id, and review-date.
+* [ ] When the example classified template is used and a classification attribute is not set, the template shall omit the classification banner rather than display an empty banner.
+* [ ] The example classified template shall support at minimum the classification levels PUBLIC, INTERNAL, CONFIDENTIAL, and RESTRICTED, with distinct colour styling defined entirely in CSS.
 
 == US-005: Custom Fonts in Themes
 As a documentation author,

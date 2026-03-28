@@ -1,5 +1,18 @@
 = State Transition Log
-:last-updated: 2026-03-08
+:last-updated: 2026-03-28
+
+== TRANSITION-006
+:date: 2026-03-28
+:intent: Classified template becomes an example, not a built-in
+:type: Feature evolution
+:risk: Medium
+:features: custom-themes (modified)
+:desired-state: The classified template is an example shipped in examples/templates/, not a built-in. --template always takes a file path (no bare-name resolution). Classification colour logic lives in the template CSS, not the JS engine.
+:prior-state: custom-themes implemented (v1.0.0) -- classified template is built-in at assets/templates/classified/, resolveTemplatePath() has bare-name resolution, classificationColours map in src/theme.js
+:capabilities-invoked: needs-stories, needs-spec, needs-design, needs-tasks, needs-tests, needs-implementation
+:constraints-checked: Licensing (pass -- no new dependencies), Connectivity (pass -- all files are local paths)
+:result: Achieved
+:artifacts-modified: docs/features/custom-themes/user-stories.adoc (v1.1.0), docs/features/custom-themes/spec.adoc (v1.1.0), docs/features/custom-themes/design.adoc (v1.1.1), docs/features/custom-themes/tasks.adoc (v2.0.0), src/theme.js (simplified -- removed resolveTemplatePath, templatesDir, classificationColours), src/commands/shared.js (simplified -- removed built-in name bypass), examples/templates/classified/template.html (new -- moved from assets/, CSS-driven colours), examples/templates/classified/theme.css (new -- moved from assets/, added [data-classification] selectors), tests/features/custom-themes/classified.test.js (updated for file paths and CSS assertions)
 
 == TRANSITION-005
 :date: 2026-03-08

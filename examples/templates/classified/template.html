@@ -10,12 +10,22 @@
 
 <!--
   PDF header: rendered by Playwright in the top margin area on every page.
-  All styles MUST be inline — Playwright's headerTemplate has no access
-  to the page stylesheet.  The element is removed from the body before
-  printing and passed to page.pdf({ headerTemplate }).
+  All styles MUST be inline or in a local <style> block — Playwright's
+  headerTemplate has no access to the page stylesheet.  Classification
+  colours are defined here via [data-classification] attribute selectors
+  so that the template is fully self-contained (no rendering engine
+  knowledge of classification levels).
 -->
-<div data-pdf-header>
-  <div style="width:calc(100% - 40mm); margin:0 20mm; text-align:center; font-family:Arial,Helvetica,sans-serif; font-size:10pt; font-weight:bold; letter-spacing:0.1em; padding:3px 0; background-color:{{banner-bg}}; color:{{banner-fg}};">{{classification}}</div>
+<div data-pdf-header data-classification="{{classification}}">
+  <style>
+    [data-classification="PUBLIC"] .classification-banner       { background-color: #2e7d32; color: #ffffff; }
+    [data-classification="INTERNAL"] .classification-banner     { background-color: #f57c00; color: #000000; }
+    [data-classification="CONFIDENTIAL"] .classification-banner { background-color: #c62828; color: #ffffff; }
+    [data-classification="RESTRICTED"] .classification-banner   { background-color: #4a148c; color: #ffffff; }
+    [data-classification=""] .classification-banner              { display: none; }
+    .classification-banner:empty                                 { display: none; }
+  </style>
+  <div class="classification-banner" style="width:calc(100% - 40mm); margin:0 20mm; text-align:center; font-family:Arial,Helvetica,sans-serif; font-size:10pt; font-weight:bold; letter-spacing:0.1em; padding:3px 0;">{{classification}}</div>
   <table style="width:calc(100% - 40mm); margin:0 20mm; border-collapse:collapse; font-family:Arial,Helvetica,sans-serif; font-size:7.5pt; border-bottom:1px solid #999;">
     <tr>
       <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; font-weight:bold; color:#555; width:11%; white-space:nowrap; background:#f5f5f5;">Document</td>
@@ -31,7 +41,7 @@
     </tr>
     <tr>
       <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; font-weight:bold; color:#555; white-space:nowrap; background:#f5f5f5;">Classification</td>
-      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; font-weight:bold; text-transform:uppercase; color:{{banner-bg}};">{{classification}}</td>
+      <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; font-weight:bold; text-transform:uppercase;">{{classification}}</td>
       <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; font-weight:bold; color:#555; white-space:nowrap; background:#f5f5f5;">Review date</td>
       <td style="padding:2px 8px; border-bottom:1px solid #e0e0e0; color:#1a1a1a;">{{review-date}}</td>
     </tr>
@@ -41,8 +51,16 @@
 <!--
   PDF footer: rendered by Playwright in the bottom margin area on every page.
 -->
-<div data-pdf-footer>
-  <div style="width:calc(100% - 40mm); margin:0 20mm; display:flex; justify-content:space-between; font-family:Arial,Helvetica,sans-serif; font-size:8pt; font-weight:bold; letter-spacing:0.1em; padding:3px 0; box-sizing:border-box; background-color:{{banner-bg}}; color:{{banner-fg}};">
+<div data-pdf-footer data-classification="{{classification}}">
+  <style>
+    [data-classification="PUBLIC"] .classification-banner       { background-color: #2e7d32; color: #ffffff; }
+    [data-classification="INTERNAL"] .classification-banner     { background-color: #f57c00; color: #000000; }
+    [data-classification="CONFIDENTIAL"] .classification-banner { background-color: #c62828; color: #ffffff; }
+    [data-classification="RESTRICTED"] .classification-banner   { background-color: #4a148c; color: #ffffff; }
+    [data-classification=""] .classification-banner              { display: none; }
+    .classification-banner:empty                                 { display: none; }
+  </style>
+  <div class="classification-banner" style="width:calc(100% - 40mm); margin:0 20mm; display:flex; justify-content:space-between; font-family:Arial,Helvetica,sans-serif; font-size:8pt; font-weight:bold; letter-spacing:0.1em; padding:3px 0; box-sizing:border-box;">
     <span>{{classification}}</span>
     <span style="font-weight:normal; letter-spacing:normal;">{{document-id}}</span>
   </div>

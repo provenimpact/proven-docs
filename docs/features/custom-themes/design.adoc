@@ -1,9 +1,9 @@
 = Design: Custom Themes
-:version: 1.0.0
+:version: 1.1.1
 :status: Current
-:source-stories-version: 1.0.0
-:source-spec-version: 1.0.0
-:last-updated: 2026-03-08
+:source-stories-version: 1.1.0
+:source-spec-version: 1.1.0
+:last-updated: 2026-03-28
 :feature: custom-themes
 :toc:
 
@@ -11,7 +11,7 @@
 
 Proven Docs is a Node.js ESM CLI tool that converts AsciiDoc files to PDF via a multi-stage pipeline: AsciiDoc → HTML → enrich → PDF. The render pipeline currently uses Asciidoctor's default stylesheet with bundled Google Fonts (replaced by inline `@font-face` declarations referencing local woff2 files). There is no support for custom styling, HTML templates, or document metadata exposure.
 
-This feature extends the pipeline with a theming layer that sits between HTML enrichment and PDF printing. It adds CSS theme override, HTML template wrapping with attribute substitution, document metadata exposure as data attributes, and a built-in classified template.
+This feature extends the pipeline with a theming layer that sits between HTML enrichment and PDF printing. It adds CSS theme override, HTML template wrapping with attribute substitution, and document metadata exposure as data attributes. An example classified template is shipped separately in `examples/templates/classified/` to demonstrate the theming system's capabilities.
 
 Existing modules affected: `src/render.js`, `src/commands/render.js`, `src/commands/watch.js`, `src/print.js`.
 
@@ -35,7 +35,7 @@ All unknowns have been resolved:
 * **CSS `@page` support in Chromium**: Chromium's print-to-PDF engine supports CSS `@page` rules including margin boxes (`@top-center`, `@bottom-left`, etc.) via `printBackground: true`. This enables per-page headers and footers in custom themes. However, margin box support has limitations — `content: attr()` from the document body does not work in margin boxes. Headers/footers must use `position: fixed` elements instead for reliable attribute-driven content.
 * **Asciidoctor document attributes API**: `@asciidoctor/core`'s `convert()` returns an HTML string. To access document attributes, we need to use `load()` first (which returns a Document object with `getAttributes()`), then `convert()` on the document. The `load()` + `convert()` approach replaces the current single-call `convert()`.
 * **Font path resolution**: When a CSS theme references fonts via relative paths in `@font-face` declarations, the paths must be resolved relative to the CSS file's directory. Since we inject CSS into an HTML data URI (no file: URL base), we must rewrite relative font paths in the CSS to absolute `file://` URLs or data URIs before injection.
-* **Built-in template resolution**: Built-in templates (like `classified`) are shipped in an `assets/templates/` directory. When `--template classified` is provided (no path separator, no file extension), the system resolves it as a built-in template name rather than a file path.
+* **Template resolution**: The `--template` flag always takes a file path. There is no built-in name resolution — the classified template ships as an example at `examples/templates/classified/` and users reference it by path like any other template.
 
 == System Design
 
@@ -78,10 +78,11 @@ src/
 │   └── shared.js         # Shared utilities (unchanged)
 assets/
 ├── fonts/                # Bundled woff2 fonts (existing)
-└── templates/            # Built-in templates (new)
+examples/
+└── templates/            # Example templates (new)
     └── classified/
-        ├── template.html # Classified document template
-        └── theme.css     # Classified document CSS theme
+        ├── template.html # Example classified document template
+        └── theme.css     # Example classified document CSS theme
 tests/
 ├── fixtures/             # Shared test fixtures (new)
 │   ├── minimal.adoc
@@ -121,7 +122,7 @@ Since `load()` then `convert()` on the document produces the same output as `asc
 
 === Theme Engine (`src/theme.js`) — New Module
 
-Responsibility: Apply CSS theme overrides, resolve templates, substitute attributes, and inject metadata into the HTML.
+Responsibility: Apply CSS theme overrides, substitute template attributes, and inject metadata into the HTML.
 
 Exports:
 
@@ -131,7 +132,7 @@ Where `ThemeOptions` is:
 ....
 {
   themePath?: string,     // Absolute path to custom CSS file
-  templatePath?: string,  // Absolute path or built-in name for HTML template
+  templatePath?: string,  // Absolute path to custom HTML template
 }
 ....
 
@@ -185,14 +186,11 @@ When no custom CSS is provided, the default stylesheet remains unchanged.
 
 When a template path is provided:
 
-1. Resolve the template: if the path contains no separator and no extension (e.g., `classified`), look in `assets/templates/<name>/template.html`. Otherwise treat as a file path.
-2. Read the template HTML from disk
-3. Substitute `{{attribute-name}}` placeholders with HTML-escaped attribute values
-4. Substitute `{{{attribute-name}}}` placeholders with raw (unescaped) attribute values
-5. Substitute `{{{body}}}` with the rendered AsciiDoc HTML body (extracted from the `<body>` tag of the enriched HTML)
-6. If a referenced attribute is not set, substitute an empty string
-
-When a built-in template is selected and has a companion CSS theme (e.g., `assets/templates/classified/theme.css`), the companion theme is applied automatically unless `--theme` is also provided (explicit theme overrides the companion).
+1. Read the template HTML file from disk (the path is always a file path — no built-in name resolution)
+2. Substitute `{{attribute-name}}` placeholders with HTML-escaped attribute values
+3. Substitute `{{{attribute-name}}}` placeholders with raw (unescaped) attribute values
+4. Substitute `{{{body}}}` with the rendered AsciiDoc HTML body (extracted from the `<body>` tag of the enriched HTML)
+5. If a referenced attribute is not set, substitute an empty string
 
 When no template is provided, the HTML passes through unchanged (with data attributes injected).
 
@@ -207,26 +205,28 @@ When processing CSS `@font-face` declarations:
 
 This ensures fonts are embedded in the HTML regardless of how the browser loads the page.
 
-=== Built-in Classified Template
+=== Example Classified Template
 
-The classified template ships at `assets/templates/classified/`:
+The classified template ships as an example at `examples/templates/classified/`. It is not special-cased in the theme engine — users reference it via `--template examples/templates/classified/template.html` like any other template.
 
 **`template.html`**: A complete HTML document with:
 
-* A classification banner in the header (colour-coded by `:classification:` value)
-* A cover page section with metadata fields (title, author, classification, handling, distribution, document-id, review-date, department)
+* A classification banner in the header and footer, colour-coded via CSS `[data-classification]` attribute selectors. Header/footer banners include local `<style>` blocks with these selectors because Playwright's `headerTemplate`/`footerTemplate` runs in an isolated rendering context without access to the page stylesheet.
+* A `data-classification` attribute on the header and footer wrapper divs (substituted via `{{classification}}`), enabling the local CSS selectors to target the correct classification level
+* A cover page section with metadata fields (title, author, classification, handling, distribution, document-id, review-date, department) using `{{attribute}}` placeholders
 * The document body injected via `{{{body}}}`
-* A footer with document-id and classification
+* A `{{{theme-css}}}` placeholder for injecting the companion CSS when `--theme` is also provided
 
 **`theme.css`**: Styles for:
 
-* Classification banner colours: PUBLIC (green), INTERNAL (amber), CONFIDENTIAL (red), RESTRICTED (dark red/purple)
+* Body-level classification colour rules via `[data-classification]` CSS attribute selectors: `[data-classification="PUBLIC"]` (green), `[data-classification="INTERNAL"]` (amber), `[data-classification="CONFIDENTIAL"]` (red), `[data-classification="RESTRICTED"]` (dark red/purple). These target the `data-classification` attribute on `<body>` injected by the theme engine.
 * Cover page layout
-* Header and footer positioning using `position: fixed` elements
+* Header and footer rendered via Playwright's `headerTemplate`/`footerTemplate` API (styled inline and via local `<style>` blocks in `template.html`)
 * CSS `@page` rules for A4 margins accommodating header/footer
 * Print-optimised typography
+* Banner hiding when classification is absent: `body:not([data-classification]) .classification-banner, [data-classification=""] .classification-banner { display: none }`
 
-When `:classification:` is not set in the document, the template uses conditional CSS (`[data-classification=""] .classification-banner, body:not([data-classification]) .classification-banner { display: none }`) to hide the banner elements.
+All colour logic lives in the template files, not the theme engine. Body-level colours are in `theme.css`; header/footer colours are in local `<style>` blocks within `template.html` (due to Playwright's isolated rendering context). The theme engine has no knowledge of classification levels or colours — it only injects `data-*` attributes on the `<body>` tag (Step 1 of the processing pipeline).
 
 === Command Changes
 
@@ -235,7 +235,7 @@ When `:classification:` is not set in the document, the template uses conditiona
 New options:
 
 * `--theme <path>` — path to a custom CSS file
-* `--template <path>` — path to a custom HTML template or built-in name
+* `--template <path>` — path to a custom HTML template
 
 Modified pipeline:
 
@@ -268,7 +268,7 @@ sequenceDiagram
     participant Print as print.js
     participant FS as File System
 
-    User->>CLI: proven-docs render report.adoc --theme brand.css --template classified
+    User->>CLI: proven-docs render report.adoc --theme brand.css --template ./template.html
     CLI->>FS: Validate input, theme, template exist
     FS-->>CLI: OK
     CLI->>FS: Read .adoc content
@@ -335,7 +335,7 @@ Criteria::
 * Mustache-style attribute substitution → Theme Engine replaces `{{attr}}` with HTML-escaped values from document attributes (THM-008)
 * Triple-brace body injection → Theme Engine replaces `{{{body}}}` with raw HTML body, and `{{{attr}}}` with unescaped attribute values (THM-009)
 * Combined template and theme → Both paths execute sequentially: CSS replacement then template application (THM-010)
-* Error on missing template → Render command validates template file/name exists before pipeline starts (THM-011)
+* Error on missing template → Render command validates template file exists before pipeline starts (THM-011)
 * Default HTML wrapper when no `--template` → Theme Engine skips template application; enriched HTML passes through with only data attribute injection (THM-012)
 
 === US-003: Surface Document Metadata in Templates
@@ -346,15 +346,15 @@ Criteria::
 * Document attributes as `data-*` on root element → Theme Engine injects `data-*` attributes on the `<body>` tag (THM-014)
 * Empty string for unset attributes → Theme Engine substitution replaces unmatched placeholders with empty string (THM-015)
 
-=== US-004: Built-in Classified Document Template
+=== US-004: Example Classified Document Template
 
-Components:: Theme Engine (`src/theme.js`), Built-in template assets (`assets/templates/classified/`)
+Components:: Example template files (`examples/templates/classified/`)
 Criteria::
-* Built-in classified template via `--template classified` → Theme Engine resolves `classified` as a built-in name to `assets/templates/classified/template.html` (THM-016)
-* Colour-coded classification banner → Classified template CSS applies colour based on `data-classification` attribute value (THM-017)
-* Cover page with metadata fields → Classified template HTML includes a cover page section with `{{attribute}}` placeholders for all metadata fields (THM-018)
-* Omit banner when classification not set → Classified template CSS hides banner when `data-classification` is empty or absent (THM-019)
-* Support multiple classification levels → Classified template CSS defines distinct styles for PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED (THM-020)
+* Example classified template at `examples/templates/classified/` → Template and CSS files shipped in `examples/` directory, referenced via `--template <path>` like any user-created template (THM-016)
+* Colour-coded classification banner via CSS attribute selectors → Template CSS uses `[data-classification="LEVEL"]` selectors to apply colours; no colour logic in the theme engine (THM-017)
+* Cover page with metadata fields → Template HTML includes a cover page section with `{{attribute}}` placeholders for all metadata fields (THM-018)
+* Omit banner when classification not set → Template CSS hides banner when `data-classification` is empty or absent (THM-019)
+* Support multiple classification levels with styling in CSS → Template CSS defines distinct `[data-classification]` selector styles for PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED (THM-020)
 
 === US-005: Custom Fonts in Themes
 

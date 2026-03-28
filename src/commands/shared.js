@@ -18,11 +18,7 @@ export function validateOutputFlags(options) {
  * Validate --theme and --template flags and return resolved options for
  * the theme engine.
  *
- * For --theme: validates that the file exists and is readable.
- * For --template: if it looks like a file path (has separator or extension),
- *   validates that it exists. Built-in names (no separator, no extension) are
- *   validated later by the theme engine.
- *
+ * Both flags take file paths. Validates that each file exists and is readable.
  * Exits with code 1 on validation failure.
  *
  * @param {{ theme?: string, template?: string }} options
@@ -47,28 +43,18 @@ export function validateThemeFlags(options) {
   }
 
   if (options.template) {
-    const tpl = options.template;
-    const hasPathSep = tpl.includes(path.sep) || tpl.includes('/');
-    const hasExt = path.extname(tpl) !== '';
-
-    if (hasPathSep || hasExt) {
-      // Looks like a file path — validate it
-      const templatePath = path.resolve(tpl);
-      try {
-        fs.accessSync(templatePath, fs.constants.R_OK);
-      } catch (err) {
-        if (err.code === 'ENOENT') {
-          process.stderr.write(`Error: Template file not found: ${templatePath}\n`);
-        } else {
-          process.stderr.write(`Error: Cannot read template file: ${templatePath}\n`);
-        }
-        process.exit(1);
+    const templatePath = path.resolve(options.template);
+    try {
+      fs.accessSync(templatePath, fs.constants.R_OK);
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        process.stderr.write(`Error: Template file not found: ${templatePath}\n`);
+      } else {
+        process.stderr.write(`Error: Cannot read template file: ${templatePath}\n`);
       }
-      result.templatePath = templatePath;
-    } else {
-      // Built-in name — pass through for theme engine to resolve
-      result.templatePath = tpl;
+      process.exit(1);
     }
+    result.templatePath = templatePath;
   }
 
   return result;
