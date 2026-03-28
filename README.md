@@ -8,7 +8,7 @@ A CLI tool for working with AsciiDoc documentation. Converts AsciiDoc files to P
 - **Syntax highlighting**: `[source,<lang>]` blocks render with colour-coded syntax (190+ languages)
 - **Custom themes**: Override the default CSS with your own stylesheet
 - **HTML templates**: Use custom HTML templates with Mustache-style variable substitution
-- **Built-in classified template**: Classification banners, running metadata header, and cover page — driven entirely by AsciiDoc attributes
+- **Example classified template**: Classification banners, running metadata header, and cover page — driven entirely by AsciiDoc attributes
 - **File watching**: Automatically re-render PDFs when source files change
 - **Validation**: Check AsciiDoc files for errors, invalid Mermaid syntax, and unrecognized source languages without rendering
 - **Document info**: Inspect document metadata (title, author, revision, custom attributes) from the command line
@@ -72,12 +72,14 @@ Use a custom theme together with a template:
 proven-docs render docs/report.adoc --theme path/to/custom.css --template path/to/template.html
 ```
 
-#### Built-in Classified Template
+#### Classified Template Example
 
-The `classified` template adds classification banners, a running metadata header table on every page, and a cover page. All content is driven by standard AsciiDoc attributes:
+An example classified template is shipped at `examples/templates/classified/`. It adds classification banners, a running metadata header table on every page, and a cover page. All content is driven by standard AsciiDoc attributes:
 
 ```bash
-proven-docs render docs/report.adoc --template classified
+proven-docs render docs/report.adoc \
+  --template examples/templates/classified/template.html \
+  --theme examples/templates/classified/theme.css
 ```
 
 The template reads these attributes from your `.adoc` file:
@@ -108,7 +110,9 @@ proven-docs watch docs/          # watches all .adoc files in directory
 Watch with a theme or template:
 
 ```bash
-proven-docs watch docs/report.adoc --template classified
+proven-docs watch docs/report.adoc \
+  --template examples/templates/classified/template.html \
+  --theme examples/templates/classified/theme.css
 ```
 
 ### Validate
@@ -147,7 +151,7 @@ The `examples/` directory contains ready-to-render documents:
 | File | Description | Command |
 |------|-------------|---------|
 | `basic.adoc` | Standard document with diagrams and code blocks | `proven-docs render examples/basic.adoc` |
-| `classified-report.adoc` | Classified document with banners and metadata | `proven-docs render examples/classified-report.adoc --template classified` |
+| `classified-report.adoc` | Classified document with banners and metadata | `proven-docs render examples/classified-report.adoc --template examples/templates/classified/template.html --theme examples/templates/classified/theme.css` |
 
 The GitHub Actions workflow renders these automatically on every push and PR, and uploads the resulting PDFs as build artifacts.
 
