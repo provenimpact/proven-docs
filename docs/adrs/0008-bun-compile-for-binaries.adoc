@@ -1,0 +1,37 @@
+= ADR-0008: Use Bun Compile for Standalone Binary Distribution
+:status: Accepted
+:date: 2026-03-28
+:deciders: Project team
+
+== Context
+
+Proven Docs needs to be distributed as a standalone CLI tool that users can install without Node.js. The tool is written in Node.js ESM and depends on npm packages (playwright-core, mermaid, highlight.js, @asciidoctor/core). A distribution format is needed that bundles the runtime, application code, and assets into a single executable per platform.
+
+The target platforms are: macOS (arm64, x64), Linux (arm64, x64), Windows (arm64, x64).
+
+== Decision
+
+Use Bun's `bun build --compile` to produce standalone platform-specific binaries. Bun is used as a build tool only; the source code remains pure Node.js ESM and continues to run on Node.js for development and npm-based installation.
+
+Assets (mermaid.min.js, highlight.js CSS, font files) are embedded at build time using string imports and `Bun.file()` so they are available at runtime without filesystem access to node_modules.
+
+Cross-compilation is handled via Bun's `--target` flag (e.g., `--target bun-linux-x64`), allowing all platform binaries to be built from a single CI runner.
+
+== Consequences
+
+* **Zero-dependency install for end users.** A single binary runs without Node.js, Bun, or any other runtime.
+* **Cross-compilation from CI.** All six platform binaries can be built on a single GitHub Actions runner.
+* **Build toolchain requires Bun.** Developers who want to build binaries locally need Bun installed. This does not affect development or testing, which remain on Node.js.
+* **Binary size ~50-90 MB.** The Bun runtime is bundled. Acceptable for a CLI tool.
+* **Asset embedding requires code changes.** `enrich.js` and `render.js` must read mermaid.js, highlight.js CSS, and fonts in a way that works both from the filesystem (Node.js/dev) and from embedded strings (compiled binary).
+
+== Alternatives Considered
+
+=== Node.js SEA (Single Executable Application)
+Built into Node.js 20+. Requires esbuild for bundling, postject for blob injection, and code signing on macOS. Multi-step build process compared to Bun's single command. Cross-compilation is not supported; each platform binary must be built on that platform.
+
+=== Deno compile
+Produces standalone binaries with good cross-compilation. Rejected because the codebase uses Node.js npm packages extensively, and Deno's npm compatibility, while improving, adds friction for packages like playwright-core that use Node.js-specific APIs.
+
+=== pkg (Vercel)
+Formerly popular Node.js binary packager. Deprecated and no longer maintained. Not suitable for new projects.

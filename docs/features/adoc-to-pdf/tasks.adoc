@@ -1,48 +1,52 @@
 = Implementation Tasks: AsciiDoc to PDF
-:version: 3.0.0
+:version: 4.0.0
 :status: Implemented
-:source-design-version: 2.1.0
-:source-stories-version: 1.2.0
-:source-spec-version: 1.2.0
-:last-updated: 2026-03-07
+:source-design-version: 2.2.0
+:source-stories-version: 1.3.0
+:source-spec-version: 1.3.0
+:last-updated: 2026-03-28
 :feature: adoc-to-pdf
 :toc:
 
 == Overview
 
-Fix include directive resolution so that `include::` paths resolve relative to the document's directory, not the CLI's working directory. Affects render, validate, and info commands. 1 phase, 4 tasks.
+Replace `playwright` with `playwright-core` and add system browser detection so that proven-docs uses an existing Chromium-based browser on the host system instead of requiring a Playwright-managed browser download. 2 phases, 4 tasks.
 
-== Phase 1: Include Resolution
+== Phase 1: Browser Discovery Module
 
-Add `base_dir` to all Asciidoctor calls so includes resolve relative to the input file's directory.
+Create the browser discovery module and swap the dependency.
 
-* [x] TASK-014: Update renderToHtml to accept and pass base_dir [parallel]
+* [x] TASK-018: Create src/browser.js with discoverBrowser() [sequential]
 +
-Components:: src/render.js
-Stories:: US-007
-Specs:: PDF-023, PDF-024
-Description:: Change `renderToHtml(source)` signature to `renderToHtml(source, baseDir)`. When `baseDir` is provided, add `base_dir: baseDir` to the Asciidoctor `convert()` options object. When omitted, do not set `base_dir` (backward compatible).
+Components:: src/browser.js (new)
+Stories:: US-008
+Specs:: PDF-028, PDF-029, PDF-030, PDF-031, PDF-032
+Description:: Create a new module `src/browser.js` that exports `discoverBrowser()`. The function checks `BROWSER_PATH` env var first, then searches platform-specific well-known paths for Chrome, Edge, and Chromium in that preference order. On macOS, check application bundle paths with `fs.existsSync()`. On Linux, resolve binary names (`google-chrome-stable`, `google-chrome`, `microsoft-edge-stable`, `microsoft-edge`, `chromium-browser`, `chromium`) via PATH lookup. On Windows, expand `%PROGRAMFILES%`, `%PROGRAMFILES(X86)%`, and `%LOCALAPPDATA%` and check known paths with `fs.existsSync()`. Return the first match found. Throw a descriptive error if no browser is found, listing supported browsers and the BROWSER_PATH escape hatch.
 
-* [x] TASK-015: Pass base_dir from render command [parallel]
+* [x] TASK-019: Swap playwright to playwright-core in package.json [parallel]
 +
-Components:: src/commands/render.js
-Stories:: US-007
-Specs:: PDF-023, PDF-024
-Description:: In the render command handler, after resolving `inputPath`, derive `baseDir` as `path.dirname(inputPath)`. Pass `baseDir` as the second argument to `renderToHtml(source, baseDir)`.
+Components:: package.json
+Stories:: US-008
+Specs:: PDF-033
+Description:: Replace `"playwright"` with `"playwright-core"` in `dependencies`. Run `npm install` to update the lock file. The version range should match the current playwright version (^1.58.2). Verify the installed package provides the same `chromium` export.
 
-* [x] TASK-016: Pass base_dir from validate command [parallel]
-+
-Components:: src/commands/validate.js
-Stories:: US-007
-Specs:: PDF-023, PDF-025
-Description:: In the validate command handler, add `base_dir: path.dirname(filePath)` to the options object passed to `asciidoctor.load()`.
+== Phase 2: Integration
 
-* [x] TASK-017: Pass base_dir from info command [parallel]
+Wire browser discovery into the PDF printer.
+
+* [x] TASK-020: Update src/print.js to use playwright-core and discoverBrowser [sequential]
 +
-Components:: src/commands/info.js
-Stories:: US-007
-Specs:: PDF-023, PDF-026
-Description:: In the info command handler, add `base_dir: path.dirname(filePath)` to the options object passed to `asciidoctor.load()`.
+Components:: src/print.js, src/browser.js
+Stories:: US-001, US-008
+Specs:: PDF-003, PDF-028, PDF-033
+Description:: Change the import from `import { chromium } from 'playwright'` to `import { chromium } from 'playwright-core'`. Import `discoverBrowser` from `./browser.js`. At the start of `printToPdf()`, call `discoverBrowser()` to get the executable path. Pass it to `chromium.launch({ executablePath })`. All other code (page.setContent, addScriptTag, page.evaluate, page.pdf) remains unchanged.
+
+* [x] TASK-021: Update existing tests for playwright-core compatibility [parallel]
++
+Components:: tests/features/adoc-to-pdf/print.test.js
+Stories:: US-001, US-008
+Specs:: PDF-003, PDF-028
+Description:: Existing print tests may import or mock `playwright`. Update any such references to `playwright-core`. Ensure existing tests pass with the new dependency. No new test files are needed here — `needs-tests` will generate browser discovery tests separately.
 
 == Traceability
 
@@ -50,7 +54,11 @@ Description:: In the info command handler, add `base_dir: path.dirname(filePath)
 |===
 | Story | Spec IDs | Tasks
 
-| US-007: Include Directive Resolution
-| PDF-023, PDF-024, PDF-025, PDF-026, PDF-027
-| TASK-014, TASK-015, TASK-016, TASK-017
+| US-001: Convert AsciiDoc File to PDF
+| PDF-003
+| TASK-020, TASK-021
+
+| US-008: System Browser Detection
+| PDF-028, PDF-029, PDF-030, PDF-031, PDF-032, PDF-033
+| TASK-018, TASK-019, TASK-020, TASK-021
 |===

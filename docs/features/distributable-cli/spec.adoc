@@ -1,0 +1,161 @@
+= Specification: Distributable CLI
+:version: 1.0.0
+:source-stories-version: 1.0.0
+:last-updated: 2026-03-28
+:feature: distributable-cli
+:prefix: DIST
+:toc:
+
+== DIST-001
+The system shall provide pre-built binaries for the following platform and architecture combinations: macOS arm64, macOS x64, Linux arm64, Linux x64, Windows arm64, Windows x64.
+
+Type:: Ubiquitous
+Source:: US-001: Criterion 1
+Verification:: Check the GitHub Release assets for a version. Confirm that binary artifacts exist for all six platform/architecture combinations.
+
+== DIST-002
+Each pre-built binary shall be a single self-contained executable that runs without requiring Node.js, Bun, or any other runtime to be installed on the target system.
+
+Type:: Ubiquitous
+Source:: US-001: Criterion 2
+Verification:: On a clean system without Node.js or Bun installed, download the binary for the platform. Run `./proven-docs --version`. Confirm it prints the version and exits successfully.
+
+== DIST-003
+When the user runs the standalone binary, all CLI commands (render, watch, validate, info) shall produce identical output to the Node.js-based installation.
+
+Type:: Event-driven
+Source:: US-001: Criterion 3
+Verification:: Run `proven-docs render`, `proven-docs validate`, and `proven-docs info` on the same .adoc file using both the standalone binary and the Node.js installation. Confirm the outputs match.
+
+== DIST-004
+When the user runs `brew install provenimpact/tap/proven-docs`, the system shall download and install the correct pre-built binary for the user's platform and architecture.
+
+Type:: Event-driven
+Source:: US-002: Criterion 1
+Verification:: On macOS, run `brew install provenimpact/tap/proven-docs`. Confirm the installed binary matches the host platform. Run `proven-docs --version` to confirm it works. (Note: Homebrew formula lives in the tap repo, not this repo.)
+
+== DIST-005
+When the user runs `npm install -g proven-docs`, the CLI shall be available as `proven-docs` in the user's PATH.
+
+Type:: Event-driven
+Source:: US-003: Criterion 1
+Verification:: On a system with Node.js installed, run `npm install -g proven-docs`. Run `proven-docs --version`. Confirm the version is printed.
+
+== DIST-006
+The published npm package shall include only the files needed to run the tool.
+
+Type:: Ubiquitous
+Source:: US-003: Criterion 2
+Verification:: Run `npm pack --dry-run` and inspect the file list. Confirm it includes bin/, src/, and assets/ but does not include tests/, docs/, examples/, or .github/.
+
+== DIST-007
+The package.json shall declare the minimum supported Node.js version.
+
+Type:: Ubiquitous
+Source:: US-003: Criterion 3
+Verification:: Read package.json. Confirm the `engines` field specifies a minimum Node.js version. Run `npm install -g proven-docs` on a Node.js version below the minimum and confirm a warning is shown.
+
+== DIST-008
+When a version tag matching `v*` is pushed to the repository, a GitHub Actions workflow shall build binaries for all supported platforms.
+
+Type:: Event-driven
+Source:: US-004: Criterion 1
+Verification:: Push a tag `v0.2.0` to the repository. Confirm the release workflow starts and builds binaries for all six platforms.
+
+== DIST-009
+When the release workflow completes successfully, it shall upload all binaries as assets to the corresponding GitHub Release.
+
+Type:: Event-driven
+Source:: US-004: Criterion 2
+Verification:: After a release workflow completes, navigate to the GitHub Release page. Confirm all six platform binaries are listed as downloadable assets.
+
+== DIST-010
+When the release workflow completes successfully, it shall publish the package to the npm registry.
+
+Type:: Event-driven
+Source:: US-004: Criterion 3
+Verification:: After a release workflow completes, run `npm view proven-docs version`. Confirm the version matches the tag.
+
+== DIST-011
+If any build or publish step in the release workflow fails, the workflow shall not publish partial artifacts to GitHub Releases or npm.
+
+Type:: Unwanted behavior
+Source:: US-004: Criterion 4
+Verification:: Simulate a build failure for one platform (e.g., inject a syntax error). Push a tag. Confirm the workflow fails and no binaries or npm package are published.
+
+== DIST-012
+The standalone binary shall include the mermaid.js library embedded within it.
+
+Type:: Ubiquitous
+Source:: US-005: Criterion 1, US-005: Criterion 3
+Verification:: Using the standalone binary on a clean system, render an .adoc file containing a Mermaid flowchart diagram. Confirm the PDF contains a rendered diagram, not raw text.
+
+== DIST-013
+The standalone binary shall include highlight.js CSS themes embedded within it.
+
+Type:: Ubiquitous
+Source:: US-005: Criterion 2, US-005: Criterion 4
+Verification:: Using the standalone binary on a clean system, render an .adoc file containing a syntax-highlighted code block. Confirm the PDF contains colored syntax highlighting.
+
+NOTE: The Homebrew formula (DIST-004) lives in the team's existing tap repository, not in this repo. This spec covers the binary artifacts and release workflow that the formula will reference.
+
+NOTE: Offline operation is enforced by the project-wide Connectivity constraint and is not duplicated here. The standalone binary satisfies it by embedding all required assets.
+
+== Traceability
+
+[cols="1,2,2", options="header"]
+|===
+| Requirement ID | Requirement Summary | Source
+
+| DIST-001
+| Pre-built binaries for 6 platforms
+| US-001: Criterion 1
+
+| DIST-002
+| Self-contained executable, no runtime needed
+| US-001: Criterion 2
+
+| DIST-003
+| CLI commands identical to Node.js installation
+| US-001: Criterion 3
+
+| DIST-004
+| Homebrew installation downloads correct binary
+| US-002: Criterion 1
+
+| DIST-005
+| npm global install puts CLI in PATH
+| US-003: Criterion 1
+
+| DIST-006
+| npm package includes only runtime files
+| US-003: Criterion 2
+
+| DIST-007
+| package.json declares minimum Node.js version
+| US-003: Criterion 3
+
+| DIST-008
+| Release workflow triggered by version tag
+| US-004: Criterion 1
+
+| DIST-009
+| Binaries uploaded to GitHub Release
+| US-004: Criterion 2
+
+| DIST-010
+| npm package published on release
+| US-004: Criterion 3
+
+| DIST-011
+| No partial artifacts on failure
+| US-004: Criterion 4
+
+| DIST-012
+| Mermaid.js embedded in binary
+| US-005: Criteria 1, 3
+
+| DIST-013
+| highlight.js CSS embedded in binary
+| US-005: Criteria 2, 4
+|===

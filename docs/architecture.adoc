@@ -1,6 +1,6 @@
 = System Architecture
-:version: 1.2.0
-:last-updated: 2026-03-06
+:version: 1.4.0
+:last-updated: 2026-03-28
 :toc:
 
 == Feature Design Sources
@@ -9,17 +9,18 @@
 |===
 | Feature | Design Version
 
-| adoc-to-pdf | 2.0.1
+| adoc-to-pdf | 2.2.1
 | cli-verbs | 1.0.1
+| distributable-cli | 1.0.0
 |===
 
 == Overview
 
-Proven Docs is a Node.js CLI tool for working with AsciiDoc documentation. Its primary function is converting AsciiDoc files to publishable PDF artifacts via a rendering pipeline: AsciiDoc source is converted to HTML, enriched with syntax highlighting and Mermaid diagram support, then printed to PDF using a headless Chromium browser.
+Proven Docs is a Node.js CLI tool for working with AsciiDoc documentation. Its primary function is converting AsciiDoc files to publishable PDF artifacts via a rendering pipeline: AsciiDoc source is converted to HTML, enriched with syntax highlighting and Mermaid diagram support, then printed to PDF using a headless Chromium-based browser detected on the host system.
 
 The CLI provides four subcommands: `render` (AsciiDoc to PDF conversion), `watch` (file monitoring with automatic re-render), `validate` (structural and syntax checking without rendering), and `info` (document metadata inspection). Each subcommand is an independent module under `src/commands/`.
 
-The tool is designed to work fully offline, integrate into CI pipelines, and produce deterministic output.
+The tool is designed to work fully offline, integrate into CI pipelines, and produce deterministic output. It ships as both an npm package (for Node.js users) and standalone platform-specific binaries (for users without Node.js), built via `bun build --compile`.
 
 == System Context (C4 Level 1)
 
@@ -40,7 +41,7 @@ C4Context
 
 == Container View (C4 Level 2)
 
-Proven Docs is a single CLI process with a modular command structure. The CLI dispatches to subcommands, each of which composes the shared pipeline modules as needed. The headless Chromium browser is a runtime dependency managed by Playwright, used only by the `render` and `watch` commands.
+Proven Docs is a single CLI process with a modular command structure. The CLI dispatches to subcommands, each of which composes the shared pipeline modules as needed. A browser discovery module detects a system-installed Chromium-based browser (Chrome, Edge, or Chromium) at runtime, used by the `render` and `watch` commands for PDF printing.
 
 [source,mermaid]
 ----
@@ -55,12 +56,14 @@ C4Container
     Container(watch_cmd, "watch command", "src/commands/watch.js + chokidar", "Monitors files, re-renders on change")
     Container(validate_cmd, "validate command", "src/commands/validate.js", "Checks AsciiDoc, Mermaid syntax, source languages")
     Container(info_cmd, "info command", "src/commands/info.js", "Displays document metadata and attributes")
+    Container(assets, "Asset Loader", "src/assets.js", "Centralised loading of mermaid.js, highlight.js CSS, and fonts")
     Container(renderer, "AsciiDoc Renderer", "src/render.js / @asciidoctor/core", "Converts AsciiDoc source to standalone HTML with local fonts")
     Container(enricher, "HTML Enricher", "src/enrich.js / highlight.js", "Server-side syntax highlighting, Mermaid block transformation")
-    Container(printer, "PDF Printer", "src/print.js / Playwright + mermaid", "Loads mermaid.js in browser, renders diagrams to SVG, prints to PDF")
+    Container(browser, "Browser Discovery", "src/browser.js", "Detects system Chrome, Edge, or Chromium; supports BROWSER_PATH override")
+    Container(printer, "PDF Printer", "src/print.js / playwright-core + mermaid", "Loads mermaid.js in browser, renders diagrams to SVG, prints to PDF")
   }
 
-  System_Ext(chromium, "Headless Chromium", "Browser binary managed by Playwright, cached locally")
+  System_Ext(chromium, "System Browser", "Chromium-based browser (Chrome, Edge, Chromium) installed on the host")
   System_Ext(filesystem, "File System", "Source and output files")
 
   Rel(author, cli, "proven-docs <command>", "Shell")
@@ -68,6 +71,8 @@ C4Container
   Rel(cli, watch_cmd, "watch")
   Rel(cli, validate_cmd, "validate")
   Rel(cli, info_cmd, "info")
+  Rel(renderer, assets, "Reads fonts")
+  Rel(enricher, assets, "Reads mermaid.js, hljs CSS")
   Rel(render_cmd, renderer, "Passes source text")
   Rel(render_cmd, enricher, "Passes HTML")
   Rel(render_cmd, printer, "Passes enriched HTML")
@@ -75,6 +80,7 @@ C4Container
   Rel(watch_cmd, enricher, "Passes HTML")
   Rel(watch_cmd, printer, "Passes enriched HTML")
   Rel(validate_cmd, renderer, "Parses AsciiDoc (load only)")
+  Rel(printer, browser, "Gets executablePath")
   Rel(printer, chromium, "Renders diagrams, prints to PDF")
   Rel(printer, filesystem, "Writes .pdf file")
   Rel(cli, filesystem, "Reads .adoc source")
@@ -94,9 +100,9 @@ C4Container
 | AsciiDoc to HTML rendering; document parsing for validate and info commands
 | <<adrs/0001-asciidoctor-js-for-rendering.adoc#,ADR-0001>>
 
-| Playwright + Chromium
-| Headless browser PDF printing (render and watch commands only)
-| <<adrs/0002-playwright-for-pdf.adoc#,ADR-0002>>
+| playwright-core + system browser
+| Headless browser PDF printing with system browser detection (render and watch commands only)
+| <<adrs/0007-playwright-core-system-browser.adoc#,ADR-0007>> (supersedes <<adrs/0002-playwright-for-pdf.adoc#,ADR-0002>>)
 
 | Commander.js
 | CLI argument parsing, subcommand routing, and help generation
@@ -117,6 +123,10 @@ C4Container
 | Vitest
 | Test framework (dev dependency)
 | --
+
+| Bun (build tool)
+| Standalone binary compilation via `bun build --compile` (build-time only, not a runtime dependency)
+| <<adrs/0008-bun-compile-for-binaries.adoc#,ADR-0008>>
 |===
 
 == Data Flow
@@ -129,7 +139,8 @@ C4Container
     -> @asciidoctor/core convert() -> HTML document (string, with inline fonts)
       -> enrich.js: highlight.js server-side -> highlighted code blocks
       -> enrich.js: transform mermaid blocks -> <pre class="mermaid">
-        -> Playwright page.setContent() -> browser DOM
+        -> browser.js: discoverBrowser() -> executablePath
+          -> playwright-core page.setContent() -> browser DOM
           -> page.addScriptTag(mermaid.min.js) -> mermaid loaded
             -> page.evaluate(mermaid.render) -> SVG diagrams
               -> page.pdf() -> PDF bytes
@@ -180,4 +191,4 @@ All subcommands support `--verbose` and `--quiet` flags (mutually exclusive, enf
 
 === Offline Operation
 
-The tool requires no network access during operation. Playwright's Chromium binary is pre-installed and cached locally. AsciiDoc rendering and validation are entirely in-process. Mermaid syntax checking uses the npm package's parse API in Node.js. This satisfies the project Connectivity constraint.
+The tool requires no network access during operation. Browser discovery is a local file-system check that finds a system-installed Chromium-based browser (Chrome, Edge, or Chromium). AsciiDoc rendering and validation are entirely in-process. Mermaid syntax checking uses the npm package's parse API in Node.js. This satisfies the project Connectivity constraint.

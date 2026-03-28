@@ -1,20 +1,7 @@
 import Asciidoctor from '@asciidoctor/core';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fontDataUri } from './assets.js';
 
 const asciidoctor = Asciidoctor();
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const fontsDir = path.join(__dirname, '..', 'assets', 'fonts');
-
-/**
- * Read a font file and return it as a base64 data URI for woff2.
- */
-function fontDataUri(filename) {
-  const buf = fs.readFileSync(path.join(fontsDir, filename));
-  return `data:font/woff2;base64,${buf.toString('base64')}`;
-}
 
 /**
  * Build inline @font-face CSS for the Asciidoctor stylesheet fonts.

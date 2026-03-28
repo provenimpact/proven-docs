@@ -1,0 +1,83 @@
+#!/usr/bin/env bun
+
+/**
+ * Build standalone platform-specific binaries using Bun compile.
+ *
+ * Usage:
+ *   bun run script/build.js           # Build all 6 platform targets
+ *   bun run script/build.js --single  # Build only for the current platform
+ */
+
+import { $ } from 'bun';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, '..');
+const distDir = path.join(projectRoot, 'dist');
+const entrypoint = path.join(projectRoot, 'bin', 'proven-docs.js');
+
+const pkg = JSON.parse(
+  fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'),
+);
+const version = pkg.version;
+
+const allTargets = [
+  { target: 'bun-darwin-arm64', os: 'darwin', arch: 'arm64' },
+  { target: 'bun-darwin-x64', os: 'darwin', arch: 'x64' },
+  { target: 'bun-linux-arm64', os: 'linux', arch: 'arm64' },
+  { target: 'bun-linux-x64', os: 'linux', arch: 'x64' },
+  { target: 'bun-windows-arm64', os: 'windows', arch: 'arm64' },
+  { target: 'bun-windows-x64', os: 'windows', arch: 'x64' },
+];
+
+const singleFlag = process.argv.includes('--single');
+
+// Map process.platform to target os names
+const platformMap = { darwin: 'darwin', linux: 'linux', win32: 'windows' };
+const archMap = { arm64: 'arm64', x64: 'x64' };
+
+const targets = singleFlag
+  ? allTargets.filter(
+      (t) =>
+        t.os === (platformMap[process.platform] || process.platform) &&
+        t.arch === (archMap[process.arch] || process.arch),
+    )
+  : allTargets;
+
+if (targets.length === 0) {
+  console.error(
+    `No matching target for platform=${process.platform} arch=${process.arch}`,
+  );
+  process.exit(1);
+}
+
+// Clean dist
+if (fs.existsSync(distDir)) {
+  fs.rmSync(distDir, { recursive: true });
+}
+fs.mkdirSync(distDir, { recursive: true });
+
+for (const { target, os, arch } of targets) {
+  const name = `proven-docs-${os}-${arch}`;
+  const outDir = path.join(distDir, name);
+  const ext = os === 'windows' ? '.exe' : '';
+  const outFile = path.join(outDir, `proven-docs${ext}`);
+
+  console.log(`Building ${name} (${target})...`);
+  fs.mkdirSync(outDir, { recursive: true });
+
+  await $`bun build --compile --target ${target} --outfile ${outFile} ${entrypoint}`;
+
+  // Package the binary
+  if (os === 'linux') {
+    await $`tar -czf ${path.join(distDir, `${name}.tar.gz`)} -C ${outDir} proven-docs${ext}`;
+  } else {
+    await $`zip -j ${path.join(distDir, `${name}.zip`)} ${outFile}`;
+  }
+
+  console.log(`  -> ${name} done`);
+}
+
+console.log(`\nBuild complete: ${targets.length} target(s) in dist/`);

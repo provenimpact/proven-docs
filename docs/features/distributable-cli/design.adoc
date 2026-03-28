@@ -1,0 +1,229 @@
+= Design: Distributable CLI
+:version: 1.0.0
+:status: Current
+:source-stories-version: 1.0.0
+:source-spec-version: 1.0.0
+:last-updated: 2026-03-28
+:feature: distributable-cli
+:toc:
+
+== Technical Context
+
+Proven Docs is a Node.js ESM CLI tool. It currently runs via `node bin/proven-docs.js` (shebang) and is installable via `npm install -g`. To reach users who don't have Node.js, the tool needs to ship as standalone platform-specific binaries.
+
+The tool has three categories of assets that are loaded from the filesystem at runtime:
+
+1. **mermaid.min.js** (~2.8 MB) -- loaded from `node_modules/mermaid/dist/mermaid.min.js` via `page.addScriptTag({ path })` in `print.js`
+2. **highlight.js CSS** (~4 KB) -- loaded from `node_modules/highlight.js/styles/github.css` via `fs.readFileSync` in `enrich.js`
+3. **Font files** (~200 KB total) -- loaded from `assets/fonts/` via `fs.readFileSync` in `render.js`
+
+In a compiled binary, `node_modules/` and `assets/` don't exist on disk. These assets must be embedded.
+
+== Decisions and Constraints
+
+* <<../../adrs/0008-bun-compile-for-binaries.adoc#,ADR-0008>>: Use Bun compile for standalone binary distribution
+* <<../../adrs/0007-playwright-core-system-browser.adoc#,ADR-0007>>: Use playwright-core with system browser detection
+
+Project constraints:
+
+* **Licensing**: Bun is MIT -- used as build tool only. No new runtime dependencies.
+* **Connectivity**: Binaries are built in CI. The tool remains fully offline at runtime.
+
+== Research and Unknowns
+
+All unknowns resolved:
+
+* **Bun compile compatibility with playwright-core**: `playwright-core` uses standard Node.js APIs (`child_process`, `net`, `http`). Bun's Node.js compatibility covers these. The critical API -- `chromium.launch({ executablePath })` + `page.pdf()` -- works in Bun.
+* **Asset embedding strategy**: Bun compile bundles all `import`-ed modules. For mermaid.js specifically, it's loaded via `page.addScriptTag({ path })` which requires a file path. In the compiled binary, the content must be passed as `page.addScriptTag({ content })` instead. The highlight.js CSS and fonts are read via `fs.readFileSync` at module load time -- these work when the paths resolve within the bundled binary's virtual filesystem.
+* **Cross-compilation**: `bun build --compile --target bun-linux-x64` produces a Linux binary from macOS. All six targets can be built on one CI runner.
+* **Binary size**: ~50-90 MB per platform. Acceptable for a CLI tool.
+
+== System Design
+
+[source,mermaid]
+----
+flowchart LR
+    SRC["Source Code\n(src/*.js)"]
+    ASSETS["Assets\n(mermaid.js, hljs CSS,\nfonts)"]
+    BUILD["Build Script\n(script/build.js)"]
+    BUN["Bun Compile\n(bun build --compile)"]
+    BINS["Platform Binaries\n(6 targets)"]
+    GHA["GitHub Actions\nRelease Workflow"]
+    GHR["GitHub Releases\n(binary assets)"]
+    NPM["npm Registry\n(package)"]
+
+    SRC --> BUILD
+    ASSETS --> BUILD
+    BUILD --> BUN
+    BUN --> BINS
+    BINS --> GHA
+    GHA --> GHR
+    GHA --> NPM
+----
+
+=== Module Structure
+
+....
+script/
+└── build.js              # Bun compile build script (cross-platform targets)
+.github/
+└── workflows/
+    └── release.yml       # GitHub Actions release workflow
+src/
+├── assets.js             # Asset loading (filesystem or embedded)
+├── browser.js            # System browser discovery (unchanged)
+├── cli.js                # CLI entry point (unchanged)
+├── render.js             # AsciiDoc renderer (uses assets.js for fonts)
+├── enrich.js             # HTML enricher (uses assets.js for hljs CSS and mermaid)
+├── print.js              # PDF printer (uses assets.js for mermaid content)
+├── theme.js              # Theme engine (unchanged)
+└── commands/             # CLI commands (unchanged)
+....
+
+=== Asset Loading (`src/assets.js`)
+
+Responsibility: Provide a single module that loads mermaid.js content, highlight.js CSS, and font files. Works both from the filesystem (Node.js/dev mode) and in a compiled binary.
+
+Exports:
+
+* `mermaidJsContent: string` -- the full text of `mermaid.min.js`
+* `hljsCss: string` -- the full text of `github.css`
+* `fontDataUri(filename: string): string` -- returns a base64 data URI for a font file
+
+Implementation:
+
+1. At module load time, resolve `__dirname` via `import.meta.url`.
+2. Compute paths relative to the source file:
+   - `mermaid.min.js`: `../node_modules/mermaid/dist/mermaid.min.js`
+   - `github.css`: `../node_modules/highlight.js/styles/github.css`
+   - Font files: `../assets/fonts/<filename>`
+3. Read each file via `fs.readFileSync`. In Node.js, this reads from the real filesystem. In a Bun-compiled binary, Bun's virtual filesystem serves the bundled files transparently.
+4. Export the loaded content as strings.
+
+This centralises all filesystem asset reads into one module, making it easy to test and maintain. The key insight: `fs.readFileSync` with `import.meta.url`-relative paths works in both Node.js and Bun-compiled binaries because Bun bundles referenced files into its virtual filesystem.
+
+=== Changes to Existing Modules
+
+**`src/enrich.js`:**
+- Remove inline `fs.readFileSync` for hljs CSS and `mermaidJsPath` resolution
+- Import `mermaidJsContent` and `hljsCss` from `./assets.js`
+- Export `mermaidJsContent` instead of `mermaidJsPath`
+
+**`src/render.js`:**
+- Remove inline `fontDataUri` and `buildFontFaceCss` functions
+- Import `fontDataUri` from `./assets.js`
+- Keep `buildFontFaceCss` logic but use the imported `fontDataUri`
+
+**`src/print.js`:**
+- Change `page.addScriptTag({ path: mermaidJsPath })` to `page.addScriptTag({ content: mermaidJsContent })`
+- Import `mermaidJsContent` from `./enrich.js` (which re-exports from assets.js)
+
+=== Build Script (`script/build.js`)
+
+Responsibility: Build standalone binaries for all target platforms using `bun build --compile`.
+
+Implementation:
+
+[source,javascript]
+----
+#!/usr/bin/env bun
+const targets = [
+  'bun-darwin-arm64',
+  'bun-darwin-x64',
+  'bun-linux-arm64',
+  'bun-linux-x64',
+  'bun-windows-arm64',
+  'bun-windows-x64',
+];
+----
+
+For each target:
+
+1. Run `bun build --compile --target <target> --outfile dist/<name>/proven-docs bin/proven-docs.js`
+2. The `<name>` format: `proven-docs-<os>-<arch>` (e.g., `proven-docs-darwin-arm64`)
+3. Package: `.tar.gz` for Linux, `.zip` for macOS and Windows
+
+Bun automatically bundles all `import`-ed dependencies and resolves `fs.readFileSync` calls with paths derived from `import.meta.url` into its virtual filesystem.
+
+A `--single` flag builds only for the current platform (for local testing).
+
+=== GitHub Actions Release Workflow (`.github/workflows/release.yml`)
+
+Responsibility: On version tag push, build binaries, create a GitHub Release, upload binary assets, and publish to npm.
+
+[source,mermaid]
+----
+sequenceDiagram
+    participant Dev as Developer
+    participant GH as GitHub
+    participant CI as Actions Runner
+    participant NPM as npm Registry
+
+    Dev->>GH: Push tag v0.2.0
+    GH->>CI: Trigger release.yml
+    CI->>CI: Install Bun
+    CI->>CI: bun install
+    CI->>CI: npm test (verify)
+    CI->>CI: bun run script/build.js (6 binaries)
+    CI->>GH: Create Release + upload binaries
+    CI->>NPM: npm publish
+    CI-->>Dev: Release complete
+----
+
+Workflow steps:
+
+1. **Trigger**: `on: push: tags: ['v*']`
+2. **Environment**: Ubuntu latest, install Bun and Node.js
+3. **Verify**: Run `npm test` to ensure all tests pass before building
+4. **Build**: Run `bun run script/build.js` to produce all 6 platform binaries
+5. **Release**: Use `gh release create` to create the GitHub Release and upload all binary archives
+6. **Publish npm**: Run `npm publish` with `NODE_AUTH_TOKEN`
+7. **Failure handling**: Each step depends on the previous. If tests fail, no build. If build fails, no release. If release fails, no npm publish.
+
+=== npm Packaging (`package.json` changes)
+
+Add the following fields:
+
+* `"engines": { "node": ">=22" }` -- minimum Node.js version for npm users
+* `"files": ["bin/", "src/", "assets/"]` -- whitelist published files
+* `"repository"`, `"homepage"`, `"bugs"` -- registry metadata
+
+== Story Resolution
+
+=== US-001: Install Without Node.js
+
+Components:: Build Script, Asset Loading
+Criteria::
+* Pre-built binaries for 6 platforms -> Build script iterates 6 Bun targets, CI uploads all (DIST-001)
+* Single self-contained executable -> `bun build --compile` bundles runtime + code + assets (DIST-002)
+* CLI commands work identically -> Same source code, same tests; assets.js abstracts filesystem differences (DIST-003)
+
+=== US-002: Install via Homebrew
+
+Components:: GitHub Release (binary assets)
+Criteria::
+* `brew install` downloads correct binary -> Homebrew formula in tap repo references GitHub Release assets by platform (DIST-004). Formula is maintained in the team's existing tap repo, not in this repo.
+
+=== US-003: Install via npm
+
+Components:: package.json
+Criteria::
+* `npm install -g` makes CLI available -> Existing `bin` field already works; no changes needed (DIST-005)
+* Package includes only runtime files -> `files` field whitelists bin/, src/, assets/ (DIST-006)
+* Minimum Node.js version declared -> `engines` field set to `>=22` (DIST-007)
+
+=== US-004: Automated Release
+
+Components:: GitHub Actions Release Workflow, Build Script
+Criteria::
+* Version tag triggers build -> Workflow triggers on `v*` tag push (DIST-008)
+* Binaries uploaded to Release -> Workflow uses `gh release create` + upload (DIST-009)
+* npm package published -> Workflow runs `npm publish` (DIST-010)
+* No partial artifacts on failure -> Sequential steps with dependencies; each step fails fast (DIST-011)
+
+=== US-005: Embedded Assets
+
+Components:: Asset Loading, changes to enrich.js, render.js, print.js
+Criteria::
+* mermaid.js embedded -> assets.js reads content via fs.readFileSync; print.js uses `addScriptTag({ content })` (DIST-012)
+* highlight.js CSS embedded -> assets.js reads CSS; enrich.js imports from assets.js (DIST-013)

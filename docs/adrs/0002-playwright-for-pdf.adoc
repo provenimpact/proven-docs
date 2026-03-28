@@ -1,5 +1,5 @@
 = ADR-0002: Use Playwright with Chromium for Headless PDF Printing
-:status: Accepted
+:status: Superseded by ADR-0007
 :date: 2026-03-05
 :deciders: Project team
 

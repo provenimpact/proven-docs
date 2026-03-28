@@ -7,17 +7,39 @@
   "bin": {
     "proven-docs": "bin/proven-docs.js"
   },
-  "scripts": {
-    "test": "vitest run"
+  "files": [
+    "bin/",
+    "src/",
+    "assets/"
+  ],
+  "engines": {
+    "node": ">=22"
   },
-  "keywords": [],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/provenimpact/proven-docs.git"
+  },
+  "homepage": "https://github.com/provenimpact/proven-docs#readme",
+  "bugs": {
+    "url": "https://github.com/provenimpact/proven-docs/issues"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "bun run script/build.js"
+  },
+  "keywords": [
+    "asciidoc",
+    "pdf",
+    "documentation",
+    "cli"
+  ],
   "dependencies": {
     "@asciidoctor/core": "^3.0.4",
     "chokidar": "^5.0.0",
     "commander": "^14.0.3",
     "highlight.js": "^11.11.1",
     "mermaid": "^11.13.0",
-    "playwright": "^1.58.2"
+    "playwright-core": "^1.58.2"
   },
   "devDependencies": {
     "vitest": "^4.1.1"

@@ -1,6 +1,6 @@
 = User Stories: AsciiDoc to PDF
-:version: 1.2.0
-:last-updated: 2026-03-07
+:version: 1.3.0
+:last-updated: 2026-03-28
 :feature: adoc-to-pdf
 :toc:
 
@@ -13,7 +13,7 @@ Acceptance Criteria:
 
 * [ ] When the user runs the render command with a path to an .adoc file, the system shall produce a PDF file in the same directory as the input file.
 * [ ] The system shall render the AsciiDoc source to HTML using asciidoctor.js.
-* [ ] The system shall open the rendered HTML in a headless Chromium browser and print it to PDF.
+* [ ] The system shall open the rendered HTML in a headless Chromium-based browser and print it to PDF.
 * [ ] The system shall save the PDF with the same base name as the input file but with a .pdf extension (e.g., report.adoc produces report.pdf).
 * [ ] The system shall complete the conversion without requiring a network connection.
 
@@ -90,3 +90,17 @@ Acceptance Criteria:
 * [ ] When the user runs the validate command from a directory different from the input file's directory, the system shall still resolve includes correctly.
 * [ ] When the user runs the info command from a directory different from the input file's directory, the system shall still resolve includes correctly.
 * [ ] If an included file does not exist at the resolved path, then the system shall report an error identifying the missing file.
+
+== US-008: System Browser Detection
+As a documentation author,
+I want the tool to automatically find and use a Chromium-based browser already installed on my system,
+so that I can install and use the tool without downloading a separate browser binary.
+
+Acceptance Criteria:
+
+* [ ] The system shall detect and use an existing Chromium-based browser (Google Chrome, Microsoft Edge, or Chromium) installed on the host system.
+* [ ] When multiple supported browsers are installed, the system shall select one using a consistent preference order.
+* [ ] When the user sets the BROWSER_PATH environment variable to a browser executable path, the system shall use that browser instead of auto-detecting.
+* [ ] If no supported browser is found and BROWSER_PATH is not set, then the system shall exit with a non-zero exit code and print an error message listing the supported browsers and how to set BROWSER_PATH.
+* [ ] The system shall detect browsers on macOS, Linux, and Windows without requiring additional configuration.
+* [ ] The system shall not require a Playwright-managed browser download (npx playwright install) for normal operation.

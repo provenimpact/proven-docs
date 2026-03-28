@@ -1,22 +1,24 @@
 = Design: AsciiDoc to PDF
-:version: 2.1.0
+:version: 2.2.1
 :status: Current
-:source-stories-version: 1.2.0
-:source-spec-version: 1.2.0
-:last-updated: 2026-03-07
+:source-stories-version: 1.3.0
+:source-spec-version: 1.3.0
+:last-updated: 2026-03-28
 :feature: adoc-to-pdf
 :toc:
 
 == Technical Context
 
-Proven Docs is a Node.js ESM CLI tool for converting AsciiDoc documentation to publishable artifacts. The core rendering pipeline (AsciiDoc → HTML → PDF) is implemented and working (v1.0.0). This design update extends the pipeline with two new capabilities: Mermaid diagram rendering and source code syntax highlighting. Both leverage the existing headless Chromium browser (Playwright) by injecting JavaScript libraries into the HTML page before PDF printing.
+Proven Docs is a Node.js ESM CLI tool for converting AsciiDoc documentation to publishable artifacts. The core rendering pipeline (AsciiDoc → HTML → PDF) is implemented and working. The pipeline uses a headless Chromium-based browser for PDF printing, with Mermaid diagram rendering and source code syntax highlighting.
 
-Existing dependencies: `@asciidoctor/core`, `playwright`, `commander`. New dependencies for this update: `mermaid`, `highlight.js`.
+The system uses `playwright-core` (API-only, no browser management) instead of the full `playwright` package. A browser discovery module detects system-installed Chromium-based browsers (Chrome, Edge, Chromium) at runtime, eliminating the need for a ~200 MB browser download on install.
+
+Dependencies: `@asciidoctor/core`, `playwright-core`, `commander`, `mermaid`, `highlight.js`, `chokidar`.
 
 == Decisions and Constraints
 
 * <<../../adrs/0001-asciidoctor-js-for-rendering.adoc#,ADR-0001>>: Use @asciidoctor/core for AsciiDoc rendering
-* <<../../adrs/0002-playwright-for-pdf.adoc#,ADR-0002>>: Use Playwright with Chromium for headless PDF printing
+* <<../../adrs/0007-playwright-core-system-browser.adoc#,ADR-0007>>: Use playwright-core with system browser detection (supersedes <<../../adrs/0002-playwright-for-pdf.adoc#,ADR-0002>>)
 * <<../../adrs/0003-commander-for-cli.adoc#,ADR-0003>>: Use Commander.js for CLI framework
 * <<../../adrs/0004-mermaid-for-diagrams.adoc#,ADR-0004>>: Use Mermaid.js for diagram rendering in browser
 * <<../../adrs/0005-highlightjs-for-syntax.adoc#,ADR-0005>>: Use highlight.js for syntax highlighting in browser
@@ -30,7 +32,7 @@ Project constraints:
 
 All unknowns have been resolved:
 
-* **Playwright browser availability**: Playwright ships browser binaries via `npx playwright install`. Once installed, browsers are cached locally and work offline. The `chromium` channel is used (not `chrome` or `msedge`).
+* **System browser availability**: `playwright-core` does not manage browsers. The browser discovery module searches well-known installation paths for Chrome, Edge, and Chromium on macOS, Linux, and Windows. The `BROWSER_PATH` environment variable provides an override. This replaces the previous approach of relying on Playwright-managed browser downloads.
 * **`page.pdf()` API**: Playwright's `page.pdf()` produces a PDF from the rendered page using Chromium's print-to-PDF engine. It supports `format` (A4, Letter), `printBackground`, `margin`, and other print options. It requires the browser to be launched in headless mode (the default).
 * **`@asciidoctor/core` output**: The `convert()` method returns an HTML string (document body). For a complete HTML document with `<html>`, `<head>`, `<body>` tags, set the `standalone` option to `true`. A standalone document is required for proper browser rendering with styles.
 * **Mermaid.js browser-side rendering**: The `mermaid` npm package requires a DOM environment. It cannot run in Node.js without a DOM shim. Since we already have headless Chromium, we inject the mermaid library source into the HTML page and let Chromium execute it. The `mermaid.run()` API converts `<pre class="mermaid">` or `<code class="language-mermaid">` elements into inline SVG. The rendering is synchronous from the page perspective — `mermaid.run()` returns a Promise that resolves when all diagrams are rendered.
@@ -48,13 +50,15 @@ flowchart LR
     CLI["CLI Entry Point\n(commander)"]
     RENDER["AsciiDoc Renderer\n(@asciidoctor/core)"]
     ENRICH["HTML Enricher\n(inject mermaid +\nhighlight.js)"]
-    PRINT["PDF Printer\n(playwright)"]
+    DISCOVER["Browser Discovery\n(system browser detection)"]
+    PRINT["PDF Printer\n(playwright-core)"]
     FS["File System"]
 
     CLI -->|"input path,\noptions"| RENDER
     FS -->|".adoc content"| RENDER
     RENDER -->|"HTML string"| ENRICH
     ENRICH -->|"enriched HTML"| PRINT
+    DISCOVER -->|"executablePath"| PRINT
     PRINT -->|".pdf bytes"| FS
 ----
 
@@ -65,6 +69,7 @@ src/
 ├── cli.js            # CLI entry point and command definitions
 ├── render.js         # AsciiDoc-to-HTML rendering with font injection
 ├── enrich.js         # HTML enrichment: inject mermaid.js + highlight.js
+├── browser.js        # System browser discovery (Chrome, Edge, Chromium)
 └── print.js          # HTML-to-PDF via headless browser (executes injected JS)
 bin/
 └── proven-docs.js    # Executable entry point (shebang + import cli)
@@ -96,8 +101,9 @@ sequenceDiagram
     participant CLI as cli.js
     participant Render as render.js
     participant Enrich as enrich.js
+    participant Discover as browser.js
     participant Print as print.js
-    participant Browser as Chromium
+    participant Browser as System Browser
     participant FS as File System
 
     User->>CLI: proven-docs render report.adoc
@@ -111,7 +117,10 @@ sequenceDiagram
     Note over Enrich: Server-side: hljs.highlight()<br/>Transform mermaid blocks
     Enrich-->>CLI: Enriched HTML
     CLI->>Print: printToPdf(html, outputPath)
-    Print->>Browser: Launch headless Chromium
+    Print->>Discover: discoverBrowser()
+    Note over Discover: Check BROWSER_PATH env<br/>or search well-known paths
+    Discover-->>Print: executablePath
+    Print->>Browser: chromium.launch({ executablePath })
     Print->>Browser: page.setContent(html)
     Print->>Browser: addScriptTag(mermaid.min.js)
     Print->>Browser: page.evaluate(mermaid.render)
@@ -170,6 +179,78 @@ Every command that processes an AsciiDoc file (render, validate, info) must:
 
 This ensures `include::` directives always resolve relative to the document's own directory, regardless of where the CLI is invoked from. Callers that do not use Asciidoctor through `renderToHtml()` (e.g., `validate` and `info` commands which call `asciidoctor.load()` directly) must pass `base_dir` in their own options object.
 
+=== Browser Discovery (`src/browser.js`)
+
+Responsibility: Detect a Chromium-based browser installed on the host system and return its executable path for use by the PDF Printer.
+
+Exports a single function:
+
+* `discoverBrowser(): string` — returns the absolute path to a Chromium-based browser executable. Throws an error if no browser is found.
+
+Implementation:
+
+1. **Environment variable override**: If `BROWSER_PATH` is set, verify the path exists and is executable, then return it. If the path does not exist, throw an error naming the invalid path.
+2. **Platform detection**: Use `process.platform` to determine the host OS (`darwin`, `linux`, `win32`).
+3. **Well-known path search**: For each platform, check a list of well-known browser installation paths in preference order:
+
+**macOS (`darwin`):**
+
+1. Google Chrome: `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`
+2. Microsoft Edge: `/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge`
+3. Chromium: `/Applications/Chromium.app/Contents/MacOS/Chromium`
+
+**Linux (`linux`):**
+
+1. Google Chrome: `google-chrome-stable`, `google-chrome` (via PATH lookup)
+2. Microsoft Edge: `microsoft-edge-stable`, `microsoft-edge` (via PATH lookup)
+3. Chromium: `chromium-browser`, `chromium` (via PATH lookup)
+
+**Windows (`win32`):**
+
+1. Google Chrome: `%PROGRAMFILES%\Google\Chrome\Application\chrome.exe`, `%PROGRAMFILES(X86)%\Google\Chrome\Application\chrome.exe`, `%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe`
+2. Microsoft Edge: `%PROGRAMFILES(X86)%\Microsoft\Edge\Application\msedge.exe`, `%PROGRAMFILES%\Microsoft\Edge\Application\msedge.exe`
+3. Chromium: `%PROGRAMFILES%\Chromium\Application\chrome.exe`, `%LOCALAPPDATA%\Chromium\Application\chrome.exe`
+
+4. **First match wins**: Return the first browser executable found. The preference order (Chrome > Edge > Chromium) reflects installation prevalence.
+5. **Playwright cache fallback**: If no system browser is found, check for a Playwright-cached browser via `chromium.executablePath()` from `playwright-core`. This handles development environments where `npx playwright install` was previously run but no system browser is installed at standard paths. If the cached path exists, return it.
+6. **No browser found**: Throw an error with a message listing the supported browsers and the `BROWSER_PATH` environment variable:
++
+....
+Error: No supported browser found.
+
+proven-docs requires a Chromium-based browser (Google Chrome, Microsoft Edge, or Chromium).
+
+Install one of these browsers, or set the BROWSER_PATH environment variable
+to the path of a Chromium-based browser executable.
+....
+
+For Linux PATH lookups, use a synchronous check (e.g., `which` or `execFileSync`) to resolve the binary path. For macOS and Windows, use `fs.existsSync()` on the well-known paths.
+
+[source,mermaid]
+----
+flowchart TD
+    START["discoverBrowser()"] --> ENV{"BROWSER_PATH\nset?"}
+
+    ENV -->|Yes| VALID{"Path\nexists?"}
+    VALID -->|Yes| RETURN["Return path"]
+    VALID -->|No| ERR_PATH["Error:\ninvalid BROWSER_PATH"]
+
+    ENV -->|No| PLATFORM{"process.platform"}
+
+    PLATFORM -->|darwin| MAC["Check macOS paths:\n1. Chrome\n2. Edge\n3. Chromium"]
+    PLATFORM -->|linux| LIN["Check Linux paths:\n1. chrome-stable\n2. edge-stable\n3. chromium"]
+    PLATFORM -->|win32| WIN["Check Windows paths:\n1. Chrome\n2. Edge\n3. Chromium"]
+
+    MAC --> FOUND{"Browser\nfound?"}
+    LIN --> FOUND
+    WIN --> FOUND
+
+    FOUND -->|Yes| RETURN
+    FOUND -->|No| PW{"Playwright\ncache?"}
+    PW -->|Yes| RETURN
+    PW -->|No| ERR_NONE["Error:\nno supported browser"]
+----
+
 === PDF Printer (`src/print.js`)
 
 Responsibility: Take an enriched HTML string, render it in a headless Chromium browser, execute Mermaid rendering if needed, capture console warnings, and print to PDF.
@@ -180,9 +261,10 @@ Exports a single function:
 
 Implementation:
 
-1. Import `chromium` from `playwright` and `mermaidJsPath` from `enrich.js`
+1. Import `chromium` from `playwright-core`, `mermaidJsPath` from `enrich.js`, and `discoverBrowser` from `browser.js`
 2. Detect if the HTML contains `class="mermaid"` blocks
-3. Launch a headless browser: `chromium.launch()`
+3. Discover browser executable: `const executablePath = discoverBrowser()`
+4. Launch a headless browser: `chromium.launch({ executablePath })`
 4. Create a new page: `browser.newPage()`
 5. Register a `console` event listener on the page to capture `console.warn()` messages from Mermaid error handling. Forward these to `process.stderr`.
 6. Set the page content: `page.setContent(html, { waitUntil: 'load' })` — syntax highlighting is already applied server-side by the enricher, so it appears immediately.
@@ -225,8 +307,16 @@ Errors are caught at the CLI level and reported to stderr:
 | Asciidoctor logs errors via its logger API
 | `Error: AsciiDoc rendering failed: <details>`
 
+| No supported browser found
+| `discoverBrowser()` throws when no browser is detected
+| `Error: No supported browser found.` (with instructions listing supported browsers and BROWSER_PATH)
+
+| Invalid BROWSER_PATH
+| `discoverBrowser()` throws when the specified path does not exist
+| `Error: Browser not found at path specified by BROWSER_PATH: <path>`
+
 | Browser launch failure
-| Playwright throws on `chromium.launch()`
+| Playwright throws on `chromium.launch({ executablePath })`
 | `Error: Failed to launch browser: <details>`
 
 | PDF write failure
@@ -253,9 +343,9 @@ Components:: CLI Entry Point, AsciiDoc Renderer, PDF Printer
 Criteria::
 * When the user runs the render command with a path to an .adoc file, the system shall produce a PDF file in the same directory as the input file → CLI resolves output path from input path, Renderer produces HTML, Printer writes PDF (PDF-001)
 * The system shall render the AsciiDoc source to HTML using asciidoctor.js → AsciiDoc Renderer uses `@asciidoctor/core` `convert()` with `standalone: true` (PDF-002)
-* The system shall open the rendered HTML in a headless Chromium browser and print it to PDF → PDF Printer uses `playwright` `chromium.launch()` + `page.pdf()` (PDF-003)
+* The system shall open the rendered HTML in a headless Chromium-based browser and print it to PDF → PDF Printer uses `playwright-core` `chromium.launch({ executablePath })` + `page.pdf()`, where `executablePath` comes from Browser Discovery (PDF-003)
 * The system shall save the PDF with the same base name as the input file but with a .pdf extension → Output Path Resolution logic replaces `.adoc` with `.pdf` (PDF-004)
-* The system shall complete the conversion without requiring a network connection → Covered by project Connectivity constraint. Playwright uses locally cached Chromium binary; no network calls in the pipeline.
+* The system shall complete the conversion without requiring a network connection → Covered by project Connectivity constraint. Browser discovery is a local file-system check; no network calls in the pipeline.
 
 === US-002: Predictable Output Location
 
@@ -312,3 +402,14 @@ Criteria::
 * When the user runs the validate command from a different directory → `src/commands/validate.js` passes `base_dir: path.dirname(filePath)` to `asciidoctor.load()` (PDF-025)
 * When the user runs the info command from a different directory → `src/commands/info.js` passes `base_dir: path.dirname(filePath)` to `asciidoctor.load()` (PDF-026)
 * If an included file does not exist at the resolved path → Asciidoctor reports the missing include via its logger; validate reports it as an error, render produces a warning in stderr (PDF-027)
+
+=== US-008: System Browser Detection
+
+Components:: Browser Discovery (`src/browser.js`), PDF Printer (`src/print.js`)
+Criteria::
+* The system shall detect and use an existing Chromium-based browser (Google Chrome, Microsoft Edge, or Chromium) installed on the host system → `discoverBrowser()` searches well-known installation paths per platform and returns the first match (PDF-028)
+* When multiple supported browsers are installed, the system shall select one using a consistent preference order → Search order is Chrome > Edge > Chromium; first found wins (PDF-029)
+* When the user sets the BROWSER_PATH environment variable, the system shall use that browser instead of auto-detecting → `discoverBrowser()` checks `process.env.BROWSER_PATH` first, before platform search (PDF-030)
+* If no supported browser is found and BROWSER_PATH is not set, then the system shall exit with a non-zero exit code and print an error message listing the supported browsers and how to set BROWSER_PATH → `discoverBrowser()` throws with a descriptive message; CLI catches and exits with code 1 (PDF-031)
+* The system shall detect browsers on macOS, Linux, and Windows without requiring additional configuration → Platform-specific path lists for `darwin`, `linux`, and `win32` are built into `src/browser.js` (PDF-032)
+* The system shall not require a Playwright-managed browser download for normal operation → `playwright-core` replaces `playwright`; no postinstall browser download (PDF-033)
