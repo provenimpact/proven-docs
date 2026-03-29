@@ -204,9 +204,9 @@ describe('PDF-009: Error on browser launch failure', () => {
     const inputFile = path.join(tmpDir, 'test-009.adoc');
     fs.writeFileSync(inputFile, '= Test\n\nContent.');
 
-    // Set PLAYWRIGHT_BROWSERS_PATH to a nonexistent directory to force launch failure
+    // Set BROWSER_PATH to a nonexistent path to force browser discovery failure
     const result = await run(['render', inputFile], {
-      env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: '/nonexistent/browsers' },
+      env: { ...process.env, BROWSER_PATH: '/nonexistent/browser' },
     });
 
     expect(result.exitCode).not.toBe(0);
@@ -217,10 +217,10 @@ describe('PDF-009: Error on browser launch failure', () => {
     fs.writeFileSync(inputFile, '= Test\n\nContent.');
 
     const result = await run(['render', inputFile], {
-      env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: '/nonexistent/browsers' },
+      env: { ...process.env, BROWSER_PATH: '/nonexistent/browser' },
     });
 
-    expect(result.stderr).toMatch(/browser|launch|chromium/i);
+    expect(result.stderr).toMatch(/browser|BROWSER_PATH/i);
   });
 });
 
