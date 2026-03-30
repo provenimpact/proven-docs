@@ -109,11 +109,17 @@ for (const relPath of pwFilesToPatch) {
   if (!fs.existsSync(filePath)) continue;
   const content = fs.readFileSync(filePath, 'utf-8');
   backups.set(filePath, content);
-  // Replace require("../../../package.json") and similar patterns with inline JSON
-  const patched = content.replace(
-    /require\(["'][^"']*package\.json["']\)/g,
-    `(${pwPkg})`,
-  );
+  // Replace require.resolve("...package.json") with a static string (used for coreDir)
+  // and require("...package.json") with inline JSON content
+  const patched = content
+    .replace(
+      /require\.resolve\(["'][^"']*package\.json["']\)/g,
+      `"/playwright-core/package.json"`,
+    )
+    .replace(
+      /require\(["'][^"']*package\.json["']\)/g,
+      `(${pwPkg})`,
+    );
   if (patched !== content) {
     fs.writeFileSync(filePath, patched);
     console.log(`  Patched ${relPath}`);
