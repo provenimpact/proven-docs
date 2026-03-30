@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { chromium } from 'playwright-core';
+
+// playwright-core is imported dynamically to allow the build script to
+// handle its package.json requirement via a Bun plugin.
+const { chromium } = await import('playwright-core');
 
 /**
  * Well-known browser installation paths by platform.
@@ -60,7 +63,7 @@ function whichSync(bin) {
 /**
  * Detect a Chromium-based browser installed on the host system.
  *
- * Preference order: BROWSER_PATH env var → Chrome → Edge → Chromium.
+ * Preference order: BROWSER_PATH env var → Chrome → Edge → Chromium → Playwright cache.
  *
  * @returns {string} Absolute path to the browser executable.
  * @throws {Error} If no supported browser is found.

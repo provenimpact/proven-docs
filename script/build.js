@@ -91,6 +91,35 @@ fs.writeFileSync(genPath, [
 ].join('\n'));
 console.log(`Generated static-assets-generated.js (${fontFiles.length} fonts + asciidoctor CSS)`);
 
+// Patch playwright-core source files to inline package.json content.
+// playwright-core does require("../../../package.json") which Bun resolves
+// to an absolute CI path at bundle time. We replace these requires with
+// inline JSON so no filesystem access is needed at runtime.
+const pwPkgPath = path.join(projectRoot, 'node_modules', 'playwright-core', 'package.json');
+const pwPkg = fs.readFileSync(pwPkgPath, 'utf-8').trim();
+const pwFilesToPatch = [
+  'lib/server/utils/nodePlatform.js',
+  'lib/server/utils/userAgent.js',
+  'lib/server/registry/dependencies.js',
+  'lib/cli/program.js',
+];
+const backups = new Map();
+for (const relPath of pwFilesToPatch) {
+  const filePath = path.join(projectRoot, 'node_modules', 'playwright-core', relPath);
+  if (!fs.existsSync(filePath)) continue;
+  const content = fs.readFileSync(filePath, 'utf-8');
+  backups.set(filePath, content);
+  // Replace require("../../../package.json") and similar patterns with inline JSON
+  const patched = content.replace(
+    /require\(["'][^"']*package\.json["']\)/g,
+    `(${pwPkg})`,
+  );
+  if (patched !== content) {
+    fs.writeFileSync(filePath, patched);
+    console.log(`  Patched ${relPath}`);
+  }
+}
+
 for (const { target, os, arch } of targets) {
   const name = `proven-docs-${os}-${arch}`;
   const outDir = path.join(distDir, name);
@@ -100,7 +129,7 @@ for (const { target, os, arch } of targets) {
   console.log(`Building ${name} (${target})...`);
   fs.mkdirSync(outDir, { recursive: true });
 
-  await $`bun build --compile --target ${target} --outfile ${outFile} --external electron --external chromium-bidi --compile-autoload-package-json --define PROVEN_DOCS_VERSION='\"${version}\"' ${entrypoint}`;
+  await $`bun build --compile --target ${target} --outfile ${outFile} --external electron --external chromium-bidi --define PROVEN_DOCS_VERSION='\"${version}\"' ${entrypoint}`;
 
   // Package the binary
   if (os === 'linux') {
@@ -111,5 +140,11 @@ for (const { target, os, arch } of targets) {
 
   console.log(`  -> ${name} done`);
 }
+
+// Restore patched playwright-core files
+for (const [filePath, content] of backups) {
+  fs.writeFileSync(filePath, content);
+}
+console.log('Restored patched playwright-core files');
 
 console.log(`\nBuild complete: ${targets.length} target(s) in dist/`);
