@@ -100,7 +100,7 @@ for (const { target, os, arch } of targets) {
   console.log(`Building ${name} (${target})...`);
   fs.mkdirSync(outDir, { recursive: true });
 
-  await $`bun build --compile --target ${target} --outfile ${outFile} --external electron --external chromium-bidi --define PROVEN_DOCS_VERSION='\"${version}\"' ${entrypoint}`;
+  await $`bun build --compile --target ${target} --outfile ${outFile} --external electron --external chromium-bidi --compile-autoload-package-json --define PROVEN_DOCS_VERSION='\"${version}\"' ${entrypoint}`;
 
   // Package the binary
   if (os === 'linux') {
