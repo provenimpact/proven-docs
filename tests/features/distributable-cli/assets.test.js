@@ -5,8 +5,6 @@
 // Spec coverage:
 //   DIST-002: Self-contained executable (asset availability)
 //   DIST-003: CLI commands identical (asset consistency)
-//   DIST-006: npm package includes only runtime files
-//   DIST-007: package.json declares minimum Node.js version
 //   DIST-012: Mermaid.js embedded in binary
 //   DIST-013: highlight.js CSS embedded in binary
 //
@@ -79,41 +77,3 @@ describe('DIST-003: CLI commands identical (print.js uses content not path)', ()
   });
 });
 
-describe('DIST-006: npm package includes only runtime files', () => {
-  it('should have a files field in package.json', () => {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'),
-    );
-    expect(pkg.files).toBeDefined();
-    expect(Array.isArray(pkg.files)).toBe(true);
-  });
-
-  it('should whitelist bin/, src/, and assets/ in files field', () => {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'),
-    );
-    expect(pkg.files).toContain('bin/');
-    expect(pkg.files).toContain('src/');
-    expect(pkg.files).toContain('assets/');
-  });
-
-  it('should not include tests, docs, or examples in files field', () => {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'),
-    );
-    for (const excluded of ['tests/', 'docs/', 'examples/', '.github/']) {
-      expect(pkg.files).not.toContain(excluded);
-    }
-  });
-});
-
-describe('DIST-007: package.json declares minimum Node.js version', () => {
-  it('should have an engines field with node constraint', () => {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'),
-    );
-    expect(pkg.engines).toBeDefined();
-    expect(pkg.engines.node).toBeDefined();
-    expect(pkg.engines.node).toMatch(/>=\s*22/);
-  });
-});

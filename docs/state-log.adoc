@@ -1,6 +1,19 @@
 = State Transition Log
 :last-updated: 2026-03-28
 
+== TRANSITION-009
+:date: 2026-03-29
+:intent: Remove npm distribution path -- distribute via standalone binaries and Homebrew tap only
+:type: Artifact maintenance
+:risk: High
+:features: distributable-cli (modified)
+:desired-state: No npm registry publishing. Distribution is via GitHub Releases (standalone binaries) and Homebrew tap only.
+:prior-state: distributable-cli feature included US-003 (npm install), DIST-005/006/007/010 (npm specs), and npm publish in release workflow
+:capabilities-invoked: needs-stories, needs-spec, needs-design, needs-tasks, needs-tests, needs-implementation
+:constraints-checked: Licensing (pass), Connectivity (pass)
+:result: Achieved
+:artifacts-modified: docs/features/distributable-cli/user-stories.adoc (v2.0.0), docs/features/distributable-cli/spec.adoc (v2.0.0), docs/features/distributable-cli/design.adoc (v2.0.0), docs/features/distributable-cli/tasks.adoc (v2.0.0), package.json (removed files/engines fields), .github/workflows/release.yml (removed npm publish), tests/features/distributable-cli/assets.test.js (removed npm tests), tests/features/distributable-cli/release.test.js (removed DIST-010 test)
+
 == TRANSITION-008
 :date: 2026-03-28
 :intent: Ship proven-docs as standalone platform-specific binaries via bun build --compile with GitHub Actions release workflow

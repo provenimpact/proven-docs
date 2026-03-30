@@ -36,12 +36,6 @@ Or install via Homebrew:
 brew install provenimpact/tap/proven-docs
 ```
 
-### npm (requires Node.js 22+)
-
-```bash
-npm install -g proven-docs
-```
-
 ### Requirements
 
 A Chromium-based browser (Google Chrome, Microsoft Edge, or Chromium) must be installed on the system. The tool auto-detects it. To use a specific browser, set the `BROWSER_PATH` environment variable:

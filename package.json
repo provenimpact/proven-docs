@@ -7,14 +7,6 @@
   "bin": {
     "proven-docs": "bin/proven-docs.js"
   },
-  "files": [
-    "bin/",
-    "src/",
-    "assets/"
-  ],
-  "engines": {
-    "node": ">=22"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/provenimpact/proven-docs.git"

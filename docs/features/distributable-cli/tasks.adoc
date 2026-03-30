@@ -1,10 +1,10 @@
 = Implementation Tasks: Distributable CLI
-:version: 1.0.0
+:version: 2.0.0
 :status: Implemented
-:source-design-version: 1.0.0
-:source-stories-version: 1.0.0
-:source-spec-version: 1.0.0
-:last-updated: 2026-03-28
+:source-design-version: 2.0.0
+:source-stories-version: 2.0.0
+:source-spec-version: 2.0.0
+:last-updated: 2026-03-29
 :feature: distributable-cli
 :toc:
 
@@ -55,12 +55,12 @@ Stories:: US-001, US-004
 Specs:: DIST-001, DIST-002, DIST-008, DIST-009
 Description:: Create a build script at `script/build.js` that uses `Bun.build()` with `compile: true` to produce standalone binaries for all 6 targets: bun-darwin-arm64, bun-darwin-x64, bun-linux-arm64, bun-linux-x64, bun-windows-arm64, bun-windows-x64. Output to `dist/<name>/`. Support a `--single` flag for building only the current platform. Package Linux binaries as `.tar.gz` and macOS/Windows as `.zip`. Add `"build": "bun run script/build.js"` to package.json scripts.
 
-* [x] TASK-006: Update package.json with npm packaging fields [parallel]
+* [x] TASK-006: Update package.json with repository metadata [parallel]
 +
 Components:: package.json
-Stories:: US-003
-Specs:: DIST-005, DIST-006, DIST-007
-Description:: Add `"engines": { "node": ">=22" }`, `"files": ["bin/", "src/", "assets/"]`, and `"repository"`, `"homepage"`, `"bugs"` fields pointing to the GitHub repo. Ensure `dist/` is in `.gitignore`.
+Stories:: US-004
+Specs:: DIST-008
+Description:: Add `"repository"`, `"homepage"`, `"bugs"` fields pointing to the GitHub repo. Add `"build"` script. Ensure `dist/` is in `.gitignore`.
 
 == Phase 3: Release Workflow
 
@@ -87,12 +87,8 @@ Description:: Create a workflow triggered by `v*` tag push. Steps: (1) checkout,
 | DIST-004
 | (Homebrew formula in tap repo, not this repo)
 
-| US-003: Install via npm
-| DIST-005, DIST-006, DIST-007
-| TASK-006
-
 | US-004: Automated Release
-| DIST-008, DIST-009, DIST-010, DIST-011
+| DIST-008, DIST-009, DIST-011
 | TASK-005, TASK-007
 
 | US-005: Embedded Assets

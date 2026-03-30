@@ -19,7 +19,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '22'
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -41,8 +40,3 @@ jobs:
             --title "${{ github.ref_name }}" \
             --generate-notes \
             dist/*.tar.gz dist/*.zip
-
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish

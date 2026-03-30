@@ -6,7 +6,6 @@
 //   DIST-001: Pre-built binaries for 6 platforms (build script exists)
 //   DIST-008: Release workflow triggered by version tag
 //   DIST-009: Binaries uploaded to GitHub Release
-//   DIST-010: npm package published on release
 //   DIST-011: No partial artifacts on failure
 //
 // Test level: Unit (static analysis of workflow and build script)
@@ -66,16 +65,6 @@ describe('DIST-009: Binaries uploaded to GitHub Release', () => {
       'utf-8',
     );
     expect(workflow).toMatch(/gh release create/);
-  });
-});
-
-describe('DIST-010: npm package published on release', () => {
-  it('should run npm publish in the workflow', () => {
-    const workflow = fs.readFileSync(
-      path.join(projectRoot, '.github', 'workflows', 'release.yml'),
-      'utf-8',
-    );
-    expect(workflow).toMatch(/npm publish/);
   });
 });
 

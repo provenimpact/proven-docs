@@ -1,9 +1,9 @@
 = Design: Distributable CLI
-:version: 1.0.0
+:version: 2.0.0
 :status: Current
-:source-stories-version: 1.0.0
-:source-spec-version: 1.0.0
-:last-updated: 2026-03-28
+:source-stories-version: 2.0.0
+:source-spec-version: 2.0.0
+:last-updated: 2026-03-29
 :feature: distributable-cli
 :toc:
 
@@ -149,7 +149,7 @@ A `--single` flag builds only for the current platform (for local testing).
 
 === GitHub Actions Release Workflow (`.github/workflows/release.yml`)
 
-Responsibility: On version tag push, build binaries, create a GitHub Release, upload binary assets, and publish to npm.
+Responsibility: On version tag push, build binaries, create a GitHub Release, and upload binary assets.
 
 [source,mermaid]
 ----
@@ -157,7 +157,6 @@ sequenceDiagram
     participant Dev as Developer
     participant GH as GitHub
     participant CI as Actions Runner
-    participant NPM as npm Registry
 
     Dev->>GH: Push tag v0.2.0
     GH->>CI: Trigger release.yml
@@ -166,7 +165,6 @@ sequenceDiagram
     CI->>CI: npm test (verify)
     CI->>CI: bun run script/build.js (6 binaries)
     CI->>GH: Create Release + upload binaries
-    CI->>NPM: npm publish
     CI-->>Dev: Release complete
 ----
 
@@ -177,16 +175,7 @@ Workflow steps:
 3. **Verify**: Run `npm test` to ensure all tests pass before building
 4. **Build**: Run `bun run script/build.js` to produce all 6 platform binaries
 5. **Release**: Use `gh release create` to create the GitHub Release and upload all binary archives
-6. **Publish npm**: Run `npm publish` with `NODE_AUTH_TOKEN`
-7. **Failure handling**: Each step depends on the previous. If tests fail, no build. If build fails, no release. If release fails, no npm publish.
-
-=== npm Packaging (`package.json` changes)
-
-Add the following fields:
-
-* `"engines": { "node": ">=22" }` -- minimum Node.js version for npm users
-* `"files": ["bin/", "src/", "assets/"]` -- whitelist published files
-* `"repository"`, `"homepage"`, `"bugs"` -- registry metadata
+6. **Failure handling**: Each step depends on the previous. If tests fail, no build. If build fails, no release.
 
 == Story Resolution
 
@@ -204,21 +193,12 @@ Components:: GitHub Release (binary assets)
 Criteria::
 * `brew install` downloads correct binary -> Homebrew formula in tap repo references GitHub Release assets by platform (DIST-004). Formula is maintained in the team's existing tap repo, not in this repo.
 
-=== US-003: Install via npm
-
-Components:: package.json
-Criteria::
-* `npm install -g` makes CLI available -> Existing `bin` field already works; no changes needed (DIST-005)
-* Package includes only runtime files -> `files` field whitelists bin/, src/, assets/ (DIST-006)
-* Minimum Node.js version declared -> `engines` field set to `>=22` (DIST-007)
-
 === US-004: Automated Release
 
 Components:: GitHub Actions Release Workflow, Build Script
 Criteria::
 * Version tag triggers build -> Workflow triggers on `v*` tag push (DIST-008)
 * Binaries uploaded to Release -> Workflow uses `gh release create` + upload (DIST-009)
-* npm package published -> Workflow runs `npm publish` (DIST-010)
 * No partial artifacts on failure -> Sequential steps with dependencies; each step fails fast (DIST-011)
 
 === US-005: Embedded Assets
