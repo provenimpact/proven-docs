@@ -6,54 +6,41 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// --- Mermaid: read the full library source for browser injection ---
-const mermaidPath = require.resolve('mermaid/dist/mermaid.min.js');
-export const mermaidJsContent = fs.readFileSync(mermaidPath, 'utf-8');
+// All assets use a dual-mode loading strategy:
+//   - Bun-compiled binary: import from static-assets-generated.js (built by script/build.js)
+//   - Node.js dev mode: read from filesystem via require.resolve / fs.readFileSync
 
-// --- Highlight.js: read the CSS theme ---
-const hljsCssPath = require.resolve('highlight.js/styles/github.css');
-export const hljsCss = fs.readFileSync(hljsCssPath, 'utf-8');
+let mermaidJsContent, hljsCss, asciidoctorCss, fontCache;
 
-// --- Asciidoctor: read the default stylesheet ---
-// In Bun-compiled binary, static-assets-generated.js is bundled with the CSS.
-// In Node.js dev mode, read from filesystem.
-let asciidoctorCss;
 try {
+  // In Bun-compiled binary, all assets are pre-computed JS string literals
   const generated = await import('./static-assets-generated.js');
+  mermaidJsContent = generated.mermaidJsContent;
+  hljsCss = generated.hljsCss;
   asciidoctorCss = generated.asciidoctorCss;
-} catch {
-  const asciidoctorCssPath = path.join(
-    __dirname, '..', 'node_modules', '@asciidoctor', 'core', 'dist', 'css', 'asciidoctor.css',
-  );
-  asciidoctorCss = fs.readFileSync(asciidoctorCssPath, 'utf-8');
-}
-export { asciidoctorCss };
-
-// --- Fonts: eagerly read all font files and cache as data URIs ---
-const fontsDir = path.join(__dirname, '..', 'assets', 'fonts');
-
-function readFontAsDataUri(filePath) {
-  const buf = fs.readFileSync(filePath);
-  return `data:font/woff2;base64,${buf.toString('base64')}`;
-}
-
-// Eagerly read all fonts at module load. In Node.js this reads from disk.
-// For Bun compile, the build script pre-generates src/fonts-generated.js
-// which is used instead (see below).
-let fontCache;
-
-try {
-  // In Bun-compiled binary, static-assets-generated.js is bundled with pre-computed data URIs
-  const generated = await import('./static-assets-generated.js');
   fontCache = generated.default;
 } catch {
-  // In Node.js dev mode, read from filesystem
+  // In Node.js dev mode, read everything from filesystem
+  mermaidJsContent = fs.readFileSync(
+    require.resolve('mermaid/dist/mermaid.min.js'), 'utf-8',
+  );
+  hljsCss = fs.readFileSync(
+    require.resolve('highlight.js/styles/github.css'), 'utf-8',
+  );
+  asciidoctorCss = fs.readFileSync(
+    path.join(__dirname, '..', 'node_modules', '@asciidoctor', 'core', 'dist', 'css', 'asciidoctor.css'),
+    'utf-8',
+  );
+
+  const fontsDir = path.join(__dirname, '..', 'assets', 'fonts');
   fontCache = new Map();
-  const fontFiles = fs.readdirSync(fontsDir).filter(f => f.endsWith('.woff2'));
-  for (const file of fontFiles) {
-    fontCache.set(file, readFontAsDataUri(path.join(fontsDir, file)));
+  for (const file of fs.readdirSync(fontsDir).filter(f => f.endsWith('.woff2'))) {
+    const buf = fs.readFileSync(path.join(fontsDir, file));
+    fontCache.set(file, `data:font/woff2;base64,${buf.toString('base64')}`);
   }
 }
+
+export { mermaidJsContent, hljsCss, asciidoctorCss };
 
 /**
  * Return a base64 data URI for a font file.
