@@ -59,12 +59,12 @@ describe('DIST-008: Release workflow triggered by version tag', () => {
 });
 
 describe('DIST-009: Binaries uploaded to GitHub Release', () => {
-  it('should use gh release create in the workflow', () => {
+  it('should upload binaries to the release', () => {
     const workflow = fs.readFileSync(
       path.join(projectRoot, '.github', 'workflows', 'release.yml'),
       'utf-8',
     );
-    expect(workflow).toMatch(/gh release create/);
+    expect(workflow).toMatch(/gh release upload/);
   });
 });
 
@@ -82,15 +82,15 @@ describe('DIST-011: No partial artifacts on failure', () => {
     expect(testIndex).toBeLessThan(buildIndex);
   });
 
-  it('should build before creating the release', () => {
+  it('should build before uploading to the release', () => {
     const workflow = fs.readFileSync(
       path.join(projectRoot, '.github', 'workflows', 'release.yml'),
       'utf-8',
     );
     const buildIndex = workflow.indexOf('script/build');
-    const releaseIndex = workflow.indexOf('gh release create');
+    const uploadIndex = workflow.indexOf('gh release upload');
     expect(buildIndex).toBeGreaterThan(-1);
-    expect(releaseIndex).toBeGreaterThan(-1);
-    expect(buildIndex).toBeLessThan(releaseIndex);
+    expect(uploadIndex).toBeGreaterThan(-1);
+    expect(buildIndex).toBeLessThan(uploadIndex);
   });
 });
