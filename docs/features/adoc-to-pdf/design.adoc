@@ -1,5 +1,5 @@
 = Design: AsciiDoc to PDF
-:version: 2.2.1
+:version: 2.2.2
 :status: Current
 :source-stories-version: 1.3.0
 :source-spec-version: 1.3.0
@@ -157,17 +157,20 @@ Responsibility: Convert AsciiDoc source text to a complete HTML document with co
 
 Exports a single function:
 
-* `renderToHtml(source: string, baseDir?: string): string` — takes raw AsciiDoc text and an optional base directory for include resolution, returns a standalone HTML document string.
+* `renderToHtml(source: string, baseDir?: string): { html: string, attributes: Record<string, string> }` — takes raw AsciiDoc text and an optional base directory for include resolution, returns a complete HTML document string and all document attributes.
 
 Implementation:
 
-1. Import `Asciidoctor` from `@asciidoctor/core`
+1. Import `Asciidoctor` from `@asciidoctor/core` and `fontDataUri`, `asciidoctorCss` from `./assets.js`
 2. Create a processor instance
-3. Build options object: `{ standalone: true, safe: 'safe' }`. When `baseDir` is provided, add `base_dir: baseDir` to the options.
-4. Call `processor.convert(source, options)`
-5. Return the HTML string
+3. Build options object: `{ safe: 'safe' }`. When `baseDir` is provided, add `base_dir: baseDir` to the options.
+4. Call `asciidoctor.load(source, options)` to parse the document and extract attributes
+5. Call `doc.convert()` to produce the body HTML (without standalone wrapper)
+6. Wrap the body in a full HTML document (`<html>`, `<head>`, `<body>`) with the pre-loaded Asciidoctor CSS and inline `@font-face` declarations
 
-The `standalone: true` option produces a full HTML document (`<html>`, `<head>`, `<body>`) with the default Asciidoctor stylesheet embedded. The `safe: 'safe'` mode restricts file access to `base_dir` and its subdirectories, which is appropriate for a rendering pipeline. The `base_dir` option tells Asciidoctor where to resolve `include::` directives from — when omitted, Asciidoctor defaults to the process working directory, which produces incorrect results when the CLI is invoked from a directory different from the document's directory.
+NOTE: Rendering uses `standalone: false` (not `standalone: true`) to avoid Asciidoctor's internal Opal runtime reading `css/asciidoctor.css` from the filesystem, which fails in Bun-compiled binaries. Instead, the Asciidoctor CSS is pre-loaded via `assets.js` and injected into the HTML wrapper directly. This produces identical output to Asciidoctor's standalone mode.
+
+The `safe: 'safe'` mode restricts file access to `base_dir` and its subdirectories, which is appropriate for a rendering pipeline. The `base_dir` option tells Asciidoctor where to resolve `include::` directives from — when omitted, Asciidoctor defaults to the process working directory, which produces incorrect results when the CLI is invoked from a directory different from the document's directory.
 
 ==== Include Resolution Strategy
 

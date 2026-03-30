@@ -1,5 +1,5 @@
 = Design: Distributable CLI
-:version: 2.0.0
+:version: 2.0.1
 :status: Current
 :source-stories-version: 2.0.0
 :source-spec-version: 2.0.0
@@ -88,19 +88,27 @@ Exports:
 
 * `mermaidJsContent: string` -- the full text of `mermaid.min.js`
 * `hljsCss: string` -- the full text of `github.css`
+* `asciidoctorCss: string` -- the full text of Asciidoctor's default stylesheet
 * `fontDataUri(filename: string): string` -- returns a base64 data URI for a font file
 
-Implementation:
+Implementation uses a dual-mode loading strategy:
 
-1. At module load time, resolve `__dirname` via `import.meta.url`.
-2. Compute paths relative to the source file:
-   - `mermaid.min.js`: `../node_modules/mermaid/dist/mermaid.min.js`
-   - `github.css`: `../node_modules/highlight.js/styles/github.css`
-   - Font files: `../assets/fonts/<filename>`
-3. Read each file via `fs.readFileSync`. In Node.js, this reads from the real filesystem. In a Bun-compiled binary, Bun's virtual filesystem serves the bundled files transparently.
-4. Export the loaded content as strings.
+**Node.js (development):**
 
-This centralises all filesystem asset reads into one module, making it easy to test and maintain. The key insight: `fs.readFileSync` with `import.meta.url`-relative paths works in both Node.js and Bun-compiled binaries because Bun bundles referenced files into its virtual filesystem.
+1. Resolve `mermaid.min.js` and `github.css` via `createRequire(import.meta.url).resolve()`.
+2. Read each via `fs.readFileSync`.
+3. Read font files from `assets/fonts/` via `fs.readdirSync` + `fs.readFileSync`.
+4. Read Asciidoctor CSS from `node_modules/@asciidoctor/core/dist/css/asciidoctor.css`.
+
+**Bun-compiled binary:**
+
+Bun does not bundle arbitrary files referenced via computed `fs.readFileSync` paths into its virtual filesystem. Only JS modules traced via `import`/`require` are bundled. Therefore:
+
+1. The build script (`script/build.js`) generates `src/static-assets-generated.js` at build time. This file contains all font data URIs and the Asciidoctor CSS as JS string literals.
+2. `assets.js` attempts `import('./static-assets-generated.js')` first. In a compiled binary this succeeds (the generated module is bundled). In Node.js dev mode the file doesn't exist, so it falls back to filesystem reads.
+3. `mermaid.min.js` and `highlight.js/styles/github.css` are resolved via `require.resolve()` which Bun's compiler traces and bundles automatically.
+
+NOTE: The original design assumed `fs.readFileSync` with `import.meta.url`-relative paths would work transparently in Bun's virtual filesystem. This proved incorrect during implementation -- Bun only bundles files that are statically `import`-ed or `require`-d, not files read via computed `fs.readFileSync` paths.
 
 === Changes to Existing Modules
 
@@ -111,8 +119,12 @@ This centralises all filesystem asset reads into one module, making it easy to t
 
 **`src/render.js`:**
 - Remove inline `fontDataUri` and `buildFontFaceCss` functions
-- Import `fontDataUri` from `./assets.js`
+- Import `fontDataUri` and `asciidoctorCss` from `./assets.js`
 - Keep `buildFontFaceCss` logic but use the imported `fontDataUri`
+- Render with `standalone: false` instead of `standalone: true` to avoid Asciidoctor's Opal runtime reading CSS from the filesystem (which fails in compiled binaries). Wrap the body HTML in a full HTML document manually, injecting the pre-loaded Asciidoctor CSS and font-face declarations.
+
+**`src/cli.js`:**
+- Version is injected at compile time via `--define PROVEN_DOCS_VERSION`. Falls back to reading `package.json` in Node.js dev mode.
 
 **`src/print.js`:**
 - Change `page.addScriptTag({ path: mermaidJsPath })` to `page.addScriptTag({ content: mermaidJsContent })`
@@ -137,13 +149,14 @@ const targets = [
 ];
 ----
 
-For each target:
+Build steps:
 
-1. Run `bun build --compile --target <target> --outfile dist/<name>/proven-docs bin/proven-docs.js`
-2. The `<name>` format: `proven-docs-<os>-<arch>` (e.g., `proven-docs-darwin-arm64`)
-3. Package: `.tar.gz` for Linux, `.zip` for macOS and Windows
+1. **Generate `src/static-assets-generated.js`**: Read all font files from `assets/fonts/` and `asciidoctor.css` from `node_modules/@asciidoctor/core/dist/css/`. Emit them as JS string literals so Bun's compiler bundles them.
+2. **For each target**: Run `bun build --compile --target <target> --outfile dist/<name>/proven-docs --external electron --external chromium-bidi --define PROVEN_DOCS_VERSION='"<version>"' bin/proven-docs.js`
+3. The `<name>` format: `proven-docs-<os>-<arch>` (e.g., `proven-docs-darwin-arm64`)
+4. Package: `.tar.gz` for Linux, `.zip` for macOS and Windows
 
-Bun automatically bundles all `import`-ed dependencies and resolves `fs.readFileSync` calls with paths derived from `import.meta.url` into its virtual filesystem.
+The `--external` flags exclude optional playwright-core dependencies (electron loader, chromium-bidi) that are never used at runtime but cause resolution errors during bundling. The `--define` flag injects the version from package.json so cli.js can report it without reading package.json from the filesystem.
 
 A `--single` flag builds only for the current platform (for local testing).
 
