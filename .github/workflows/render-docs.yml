@@ -19,7 +19,6 @@ jobs:
 
       - run: npm ci
 
-      - run: npx playwright install --with-deps chromium
 
       - run: npm test
 
@@ -35,7 +34,6 @@ jobs:
 
       - run: npm ci
 
-      - run: npx playwright install --with-deps chromium
 
       - name: Install proven-docs globally
         run: npm install -g .

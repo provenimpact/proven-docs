@@ -1,0 +1,49 @@
+= User Stories: Distributable CLI
+:version: 2.0.0
+:last-updated: 2026-03-29
+:feature: distributable-cli
+:toc:
+
+== US-001: Install Without Node.js
+As a documentation author,
+I want to install proven-docs as a standalone binary,
+so that I do not need Node.js or any other runtime pre-installed on my system.
+
+Acceptance Criteria:
+
+* [ ] The system shall provide pre-built binaries for macOS (arm64, x64), Linux (arm64, x64), and Windows (arm64, x64).
+* [ ] Each binary shall be a single self-contained executable that runs without requiring Node.js, Bun, or any other runtime.
+* [ ] When the user runs the binary, all CLI commands (render, watch, validate, info) shall work identically to the Node.js-based installation.
+
+== US-002: Install via Homebrew
+As a macOS or Linux user,
+I want to install proven-docs via Homebrew,
+so that I can install and update it using my system package manager.
+
+Acceptance Criteria:
+
+* [ ] When the user runs `brew install provenimpact/tap/proven-docs`, the system shall download and install the correct binary for their platform.
+* [ ] The installed binary shall be available as `proven-docs` in the user's PATH.
+
+== US-004: Automated Release
+As a project maintainer,
+I want releases to be built and published automatically when I push a version tag,
+so that I do not need to run manual build steps on each platform.
+
+Acceptance Criteria:
+
+* [ ] When a version tag (e.g., v0.2.0) is pushed to the repository, a GitHub Actions workflow shall build binaries for all supported platforms.
+* [ ] The workflow shall upload all binaries as assets to the corresponding GitHub Release.
+* [ ] If any build step fails, the workflow shall report the failure without publishing partial artifacts.
+
+== US-005: Embedded Assets
+As a documentation author using the standalone binary,
+I want Mermaid diagrams and syntax highlighting to work without external files,
+so that the binary is truly self-contained with no runtime file dependencies.
+
+Acceptance Criteria:
+
+* [ ] The standalone binary shall include the mermaid.js library embedded within it.
+* [ ] The standalone binary shall include highlight.js CSS themes embedded within it.
+* [ ] When the user renders a document with Mermaid diagrams using the standalone binary, the diagrams shall render correctly.
+* [ ] When the user renders a document with syntax-highlighted code using the standalone binary, the highlighting shall render correctly.

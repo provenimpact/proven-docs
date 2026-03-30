@@ -1,30 +1,8 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import hljs from 'highlight.js';
+import { mermaidJsContent as _mermaidJsContent, hljsCss } from './assets.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// --- Highlight.js: read CSS theme at module load ---
-const hljsCssPath = path.join(
-  __dirname,
-  '..',
-  'node_modules',
-  'highlight.js',
-  'styles',
-  'github.css',
-);
-const hljsCss = fs.readFileSync(hljsCssPath, 'utf-8');
-
-// --- Mermaid: resolve the library path for the printer to load via addScriptTag ---
-export const mermaidJsPath = path.join(
-  __dirname,
-  '..',
-  'node_modules',
-  'mermaid',
-  'dist',
-  'mermaid.min.js',
-);
+// Re-export for print.js to use with page.addScriptTag({ content })
+export const mermaidJsContent = _mermaidJsContent;
 
 /**
  * Transform Asciidoctor's mermaid code blocks into <pre class="mermaid"> elements.

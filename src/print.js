@@ -1,5 +1,6 @@
-import { chromium } from 'playwright';
-import { mermaidJsPath } from './enrich.js';
+import { chromium } from 'playwright-core';
+import { mermaidJsContent } from './enrich.js';
+import { discoverBrowser } from './browser.js';
 
 /**
  * Print an HTML string to PDF using a headless Chromium browser.
@@ -22,7 +23,8 @@ export async function printToPdf(html, outputPath) {
   const hasMermaid = html.includes('class="mermaid"');
   let browser;
   try {
-    browser = await chromium.launch();
+    const executablePath = discoverBrowser();
+    browser = await chromium.launch({ executablePath });
     const page = await browser.newPage();
 
     // Capture console warnings from mermaid error handling
@@ -36,7 +38,7 @@ export async function printToPdf(html, outputPath) {
 
     // If mermaid blocks exist, load and execute mermaid.js in the browser
     if (hasMermaid) {
-      await page.addScriptTag({ path: mermaidJsPath });
+      await page.addScriptTag({ content: mermaidJsContent });
 
       await page.evaluate(async () => {
         /* global mermaid */

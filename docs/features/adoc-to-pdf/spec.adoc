@@ -1,7 +1,7 @@
 = Specification: AsciiDoc to PDF
-:version: 1.2.0
-:source-stories-version: 1.2.0
-:last-updated: 2026-03-07
+:version: 1.3.0
+:source-stories-version: 1.3.0
+:last-updated: 2026-03-28
 :feature: adoc-to-pdf
 :prefix: PDF
 :toc:
@@ -21,7 +21,7 @@ Source:: US-001: Criterion 2
 Verification:: Provide an .adoc file containing AsciiDoc formatting (headings, lists, bold text). Run the render command. Open the resulting PDF and confirm that all AsciiDoc formatting is faithfully represented.
 
 == PDF-003
-The system shall produce the PDF by printing the rendered HTML in a headless browser.
+The system shall produce the PDF by printing the rendered HTML in a headless Chromium-based browser.
 
 Type:: Ubiquitous
 Source:: US-001: Criterion 3
@@ -197,6 +197,48 @@ Type:: Unwanted behavior
 Source:: US-007: Criterion 5
 Verification:: Create an .adoc file with an `include::` directive pointing to a non-existent file. Run the render command. Confirm that an error or warning is reported that identifies the missing file path.
 
+== PDF-028
+The system shall detect and use an existing Chromium-based browser (Google Chrome, Microsoft Edge, or Chromium) installed on the host system.
+
+Type:: Ubiquitous
+Source:: US-008: Criterion 1
+Verification:: Install proven-docs on a system that has Google Chrome, Microsoft Edge, or Chromium installed but has no Playwright-managed browser. Run the render command on a valid .adoc file. Confirm that a PDF is produced successfully.
+
+== PDF-029
+When multiple supported browsers are installed, the system shall select one using a consistent preference order.
+
+Type:: Event-driven
+Source:: US-008: Criterion 2
+Verification:: On a system with both Google Chrome and Microsoft Edge installed, run the render command twice. Confirm that the same browser is selected both times (consistent output, no non-deterministic behavior).
+
+== PDF-030
+When the BROWSER_PATH environment variable is set to a browser executable path, the system shall use that browser instead of auto-detecting.
+
+Type:: Event-driven
+Source:: US-008: Criterion 3
+Verification:: Set BROWSER_PATH to a known Chromium-based browser executable. Run the render command. Confirm the system uses the specified browser. Unset BROWSER_PATH and confirm the system falls back to auto-detection.
+
+== PDF-031
+If no supported browser is found and BROWSER_PATH is not set, then the system shall exit with a non-zero exit code and print an error message listing the supported browsers and how to set BROWSER_PATH.
+
+Type:: Unwanted behavior
+Source:: US-008: Criterion 4
+Verification:: Run the render command in an environment where no supported browser is installed and BROWSER_PATH is not set. Confirm the process exits with a non-zero code and the error message names the supported browsers (Chrome, Edge, Chromium) and mentions the BROWSER_PATH environment variable.
+
+== PDF-032
+The system shall detect browsers on macOS, Linux, and Windows without requiring additional user configuration.
+
+Type:: Ubiquitous
+Source:: US-008: Criterion 5
+Verification:: On each supported platform (macOS, Linux, Windows), install a supported browser in its default location. Run the render command without setting BROWSER_PATH. Confirm the browser is detected and a PDF is produced.
+
+== PDF-033
+The system shall not require a Playwright-managed browser download for normal operation.
+
+Type:: Ubiquitous
+Source:: US-008: Criterion 6
+Verification:: Install proven-docs via npm on a system that has never run `npx playwright install`. Confirm that the render command succeeds using a system-installed browser without prompting for or requiring a Playwright browser download.
+
 == Traceability
 
 [cols="1,2,2", options="header"]
@@ -310,4 +352,28 @@ Verification:: Create an .adoc file with an `include::` directive pointing to a 
 | PDF-027
 | Error on missing included file
 | US-007: Criterion 5
+
+| PDF-028
+| Detect and use system-installed browser
+| US-008: Criterion 1
+
+| PDF-029
+| Consistent browser preference order
+| US-008: Criterion 2
+
+| PDF-030
+| BROWSER_PATH override
+| US-008: Criterion 3
+
+| PDF-031
+| Error when no browser found
+| US-008: Criterion 4
+
+| PDF-032
+| Cross-platform browser detection
+| US-008: Criterion 5
+
+| PDF-033
+| No Playwright browser download required
+| US-008: Criterion 6
 |===

@@ -15,15 +15,33 @@ A CLI tool for working with AsciiDoc documentation. Converts AsciiDoc files to P
 - **Fully offline**: No network requests during operation. Fonts, mermaid.js, and highlight.js are all bundled locally.
 - **Print-friendly**: Highlight.js `github` theme is legible on paper
 
-## Prerequisites
-
-- Node.js 22+
-
 ## Install
 
+### Standalone binary (no Node.js required)
+
+Download the latest binary for your platform from [GitHub Releases](https://github.com/provenimpact/proven-docs/releases):
+
+| Platform | Asset |
+|----------|-------|
+| macOS (Apple Silicon) | `proven-docs-darwin-arm64.zip` |
+| macOS (Intel) | `proven-docs-darwin-x64.zip` |
+| Linux (arm64) | `proven-docs-linux-arm64.tar.gz` |
+| Linux (x64) | `proven-docs-linux-x64.tar.gz` |
+| Windows (arm64) | `proven-docs-windows-arm64.zip` |
+| Windows (x64) | `proven-docs-windows-x64.zip` |
+
+Or install via Homebrew:
+
 ```bash
-npm install -g .
-npx playwright install chromium
+brew install provenimpact/tap/proven-docs
+```
+
+### Requirements
+
+A Chromium-based browser (Google Chrome, Microsoft Edge, or Chromium) must be installed on the system. The tool auto-detects it. To use a specific browser, set the `BROWSER_PATH` environment variable:
+
+```bash
+export BROWSER_PATH=/path/to/chrome
 ```
 
 After installation, the `proven-docs` command is available globally.

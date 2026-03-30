@@ -1,0 +1,97 @@
+= Implementation Tasks: Distributable CLI
+:version: 2.0.0
+:status: Implemented
+:source-design-version: 2.0.0
+:source-stories-version: 2.0.0
+:source-spec-version: 2.0.0
+:last-updated: 2026-03-29
+:feature: distributable-cli
+:toc:
+
+== Overview
+
+Add standalone binary distribution via Bun compile, a GitHub Actions release workflow, and npm packaging fields. 3 phases, 7 tasks.
+
+== Phase 1: Asset Embedding
+
+Extract asset loading into a central module and update consumers.
+
+* [x] TASK-001: Create src/assets.js for centralised asset loading [sequential]
++
+Components:: src/assets.js (new)
+Stories:: US-005
+Specs:: DIST-012, DIST-013
+Description:: Create `src/assets.js` that exports `mermaidJsContent` (full text of mermaid.min.js), `hljsCss` (full text of github.css), and `fontDataUri(filename)` (base64 data URI for a font file). Read all assets via `fs.readFileSync` with paths derived from `import.meta.url`. This works in both Node.js (filesystem) and Bun-compiled binaries (virtual filesystem).
+
+* [x] TASK-002: Update src/enrich.js to use assets.js [parallel]
++
+Components:: src/enrich.js, src/assets.js
+Stories:: US-005
+Specs:: DIST-012, DIST-013
+Description:: Remove the inline `fs.readFileSync` for `hljsCss` and the `mermaidJsPath` resolution. Import `mermaidJsContent` and `hljsCss` from `./assets.js`. Export `mermaidJsContent` (instead of `mermaidJsPath`) for use by print.js.
+
+* [x] TASK-003: Update src/render.js to use assets.js for fonts [parallel]
++
+Components:: src/render.js, src/assets.js
+Stories:: US-005
+Specs:: DIST-012, DIST-013
+Description:: Remove the inline `fontDataUri` function and `fontsDir` resolution. Import `fontDataUri` from `./assets.js`. Keep the `buildFontFaceCss` function using the imported `fontDataUri`.
+
+* [x] TASK-004: Update src/print.js to use content-based mermaid loading [sequential]
++
+Components:: src/print.js, src/enrich.js
+Stories:: US-005
+Specs:: DIST-012
+Description:: Change `import { mermaidJsPath } from './enrich.js'` to `import { mermaidJsContent } from './enrich.js'`. Replace `page.addScriptTag({ path: mermaidJsPath })` with `page.addScriptTag({ content: mermaidJsContent })`. This eliminates the filesystem path dependency for mermaid.js.
+
+== Phase 2: Build Script and npm Packaging
+
+Create the build script and update package.json for distribution.
+
+* [x] TASK-005: Create script/build.js for Bun compile [parallel]
++
+Components:: script/build.js (new)
+Stories:: US-001, US-004
+Specs:: DIST-001, DIST-002, DIST-008, DIST-009
+Description:: Create a build script at `script/build.js` that uses `Bun.build()` with `compile: true` to produce standalone binaries for all 6 targets: bun-darwin-arm64, bun-darwin-x64, bun-linux-arm64, bun-linux-x64, bun-windows-arm64, bun-windows-x64. Output to `dist/<name>/`. Support a `--single` flag for building only the current platform. Package Linux binaries as `.tar.gz` and macOS/Windows as `.zip`. Add `"build": "bun run script/build.js"` to package.json scripts.
+
+* [x] TASK-006: Update package.json with repository metadata [parallel]
++
+Components:: package.json
+Stories:: US-004
+Specs:: DIST-008
+Description:: Add `"repository"`, `"homepage"`, `"bugs"` fields pointing to the GitHub repo. Add `"build"` script. Ensure `dist/` is in `.gitignore`.
+
+== Phase 3: Release Workflow
+
+Create the GitHub Actions workflow for automated releases.
+
+* [x] TASK-007: Create .github/workflows/release.yml [sequential]
++
+Components:: .github/workflows/release.yml (new)
+Stories:: US-004
+Specs:: DIST-008, DIST-009, DIST-010, DIST-011
+Description:: Create a workflow triggered by `v*` tag push. Steps: (1) checkout, (2) install Bun and Node.js, (3) `bun install`, (4) `npm test` to verify, (5) `bun run script/build.js` to build all binaries, (6) `gh release create` with all binary archives, (7) `npm publish` with NODE_AUTH_TOKEN secret. Each step depends on the previous for fail-fast behavior.
+
+== Traceability
+
+[cols="1,1,1", options="header"]
+|===
+| Story | Spec IDs | Tasks
+
+| US-001: Install Without Node.js
+| DIST-001, DIST-002, DIST-003
+| TASK-001, TASK-002, TASK-003, TASK-004, TASK-005
+
+| US-002: Install via Homebrew
+| DIST-004
+| (Homebrew formula in tap repo, not this repo)
+
+| US-004: Automated Release
+| DIST-008, DIST-009, DIST-011
+| TASK-005, TASK-007
+
+| US-005: Embedded Assets
+| DIST-012, DIST-013
+| TASK-001, TASK-002, TASK-003, TASK-004
+|===

@@ -1,0 +1,45 @@
+= ADR-0007: Use playwright-core with System Browser Detection
+:status: Accepted
+:date: 2026-03-28
+:deciders: Project team
+:supersedes: ADR-0002
+
+== Context
+
+Proven Docs uses Playwright's `page.pdf()` API for HTML-to-PDF conversion via headless browser printing (<<0002-playwright-for-pdf.adoc#,ADR-0002>>). The full `playwright` package automatically downloads and manages browser binaries (~200 MB for Chromium). This creates significant friction for CLI distribution:
+
+* `npm install -g proven-docs` triggers a ~200 MB browser download via a postinstall hook, which is slow, surprising, and fails in restricted network environments.
+* CI/CD pipelines require an explicit `npx playwright install chromium --with-deps` step that downloads ~200 MB per run (unless cached).
+* Most developer machines and CI environments already have a Chromium-based browser installed (Chrome, Edge, or Chromium).
+
+The project needs a distribution model where `npm install -g proven-docs` works without a separate browser download, while preserving the same PDF rendering fidelity.
+
+== Decision
+
+Replace the `playwright` dependency with `playwright-core` and add a browser discovery module that detects system-installed Chromium-based browsers at runtime.
+
+`playwright-core` provides the identical Playwright API (`chromium.launch()`, `page.pdf()`, etc.) but does not download or manage browser binaries. The browser discovery module searches well-known installation paths for Google Chrome, Microsoft Edge, and Chromium on macOS, Linux, and Windows, and passes the found executable path to `chromium.launch({ executablePath })`.
+
+Users can override auto-detection by setting the `BROWSER_PATH` environment variable to a specific browser executable.
+
+== Consequences
+
+* **Zero extra download for most users.** Any system with Chrome, Edge, or Chromium installed works out of the box after `npm install -g proven-docs`.
+* **CI/CD works with preinstalled browsers.** GitHub Actions (ubuntu-latest includes Chrome), GitLab CI with Chromium, and Docker images with Chromium all work without a Playwright install step.
+* **Smaller npm package.** `playwright-core` is ~3 MB vs. `playwright` ~3 MB + ~200 MB browser download.
+* **Requires a Chromium-based browser on the host.** Systems without Chrome, Edge, or Chromium will get a clear error message with instructions.
+* **BROWSER_PATH escape hatch.** Users with non-standard browser installations or specific version requirements can point to any Chromium-based executable.
+* **Same API, same PDF output.** `playwright-core` exposes the identical API as `playwright`. The `chromium.launch()` call gains an `executablePath` option; all other code (page.setContent, page.pdf, addScriptTag) is unchanged.
+* **Offline constraint satisfied.** Browser detection is a local file-system check. No network requests during operation.
+* **Licensing unchanged.** `playwright-core` is Apache-2.0, same as `playwright`.
+
+== Alternatives Considered
+
+=== Keep playwright with postinstall hook
+Continue using the full `playwright` package and add a postinstall script to automatically run `npx playwright install chromium`. Rejected because it still downloads ~200 MB on install, which is slow and surprising for a CLI tool. Network-restricted environments would fail.
+
+=== puppeteer-core with system browser detection
+Use `puppeteer-core` instead of `playwright-core` for the same system-browser approach. Rejected because the existing codebase uses Playwright's API throughout (launch, page.setContent, page.pdf, addScriptTag, page.evaluate), and puppeteer-core has a slightly different API surface. Switching would require gratuitous code changes with no benefit. Both packages are Apache-2.0.
+
+=== WeasyPrint or Typst for PDF generation
+Replace the browser-based PDF pipeline entirely with a lightweight rendering engine. Rejected because neither supports client-side JavaScript execution, which is required for Mermaid diagram rendering in the browser. Server-side Mermaid rendering (via jsdom) is a possible future direction but would be a much larger architectural change.

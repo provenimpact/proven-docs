@@ -1,6 +1,45 @@
 = State Transition Log
 :last-updated: 2026-03-28
 
+== TRANSITION-009
+:date: 2026-03-29
+:intent: Remove npm distribution path -- distribute via standalone binaries and Homebrew tap only
+:type: Artifact maintenance
+:risk: High
+:features: distributable-cli (modified)
+:desired-state: No npm registry publishing. Distribution is via GitHub Releases (standalone binaries) and Homebrew tap only.
+:prior-state: distributable-cli feature included US-003 (npm install), DIST-005/006/007/010 (npm specs), and npm publish in release workflow
+:capabilities-invoked: needs-stories, needs-spec, needs-design, needs-tasks, needs-tests, needs-implementation
+:constraints-checked: Licensing (pass), Connectivity (pass)
+:result: Achieved
+:artifacts-modified: docs/features/distributable-cli/user-stories.adoc (v2.0.0), docs/features/distributable-cli/spec.adoc (v2.0.0), docs/features/distributable-cli/design.adoc (v2.0.0), docs/features/distributable-cli/tasks.adoc (v2.0.0), package.json (removed files/engines fields), .github/workflows/release.yml (removed npm publish), tests/features/distributable-cli/assets.test.js (removed npm tests), tests/features/distributable-cli/release.test.js (removed DIST-010 test)
+
+== TRANSITION-008
+:date: 2026-03-28
+:intent: Ship proven-docs as standalone platform-specific binaries via bun build --compile with GitHub Actions release workflow
+:type: Feature evolution
+:risk: High
+:features: distributable-cli (new)
+:desired-state: proven-docs ships as standalone binaries (darwin-arm64, darwin-x64, linux-arm64, linux-x64, windows-arm64, windows-x64) built with bun build --compile. GitHub Actions release workflow builds and uploads binaries on version tag push. mermaid.js asset is embedded in binary. npm packaging fields are set.
+:prior-state: No build system, no release workflow, no npm packaging fields. CLI runs via node + shebang only.
+:capabilities-invoked: needs-stories, needs-spec, needs-design, needs-adr, needs-tasks, needs-tests, needs-implementation, needs-architecture
+:constraints-checked: Licensing (pass -- Bun is MIT, build-time only), Connectivity (pass -- binaries built in CI, tool remains fully offline at runtime)
+:result: Achieved
+:artifacts-modified: docs/features/distributable-cli/user-stories.adoc (v1.0.0), docs/features/distributable-cli/spec.adoc (v1.0.0), docs/features/distributable-cli/design.adoc (v1.0.0), docs/features/distributable-cli/tasks.adoc (v1.0.0), docs/adrs/0008-bun-compile-for-binaries.adoc (new), docs/adrs/index.adoc (v1.4.0), docs/architecture.adoc (v1.4.0), src/assets.js (new), src/enrich.js (refactored -- imports from assets.js), src/render.js (refactored -- imports fontDataUri from assets.js), src/print.js (updated -- addScriptTag content instead of path), script/build.js (new), package.json (engines, files, repository, build script), .github/workflows/release.yml (new), tests/features/distributable-cli/assets.test.js (new), tests/features/distributable-cli/release.test.js (new)
+
+== TRANSITION-007
+:date: 2026-03-28
+:intent: Replace playwright with playwright-core and add system browser detection for zero-download installs
+:type: Feature evolution
+:risk: High
+:features: adoc-to-pdf (extended)
+:desired-state: proven-docs uses playwright-core with automatic system browser detection (Chrome, Edge, Chromium) instead of bundled Playwright browsers. npm install -g proven-docs works without a 200MB browser download. CI/CD environments with preinstalled browsers work out of the box.
+:prior-state: adoc-to-pdf implemented (v2.1.0) -- uses playwright (full) which requires npx playwright install chromium (~200MB download)
+:capabilities-invoked: needs-stories, needs-spec, needs-design, needs-adr, needs-tasks, needs-tests, needs-implementation, needs-architecture
+:constraints-checked: Licensing (pass -- playwright-core is Apache-2.0, no new dependencies), Connectivity (pass -- browser discovery is a local file-system check, no network requests)
+:result: Achieved
+:artifacts-modified: docs/features/adoc-to-pdf/user-stories.adoc (v1.3.0), docs/features/adoc-to-pdf/spec.adoc (v1.3.0), docs/features/adoc-to-pdf/design.adoc (v2.2.1), docs/features/adoc-to-pdf/tasks.adoc (v4.0.0), docs/adrs/0007-playwright-core-system-browser.adoc (new), docs/adrs/0002-playwright-for-pdf.adoc (superseded), docs/adrs/index.adoc (v1.3.0), docs/architecture.adoc (v1.3.0), src/browser.js (new), src/print.js (updated), package.json (playwright → playwright-core), tests/features/adoc-to-pdf/browser.test.js (new)
+
 == TRANSITION-006
 :date: 2026-03-28
 :intent: Classified template becomes an example, not a built-in
