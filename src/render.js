@@ -1,5 +1,5 @@
 import Asciidoctor from '@asciidoctor/core';
-import { fontDataUri } from './assets.js';
+import { fontDataUri, asciidoctorCss } from './assets.js';
 
 const asciidoctor = Asciidoctor();
 
@@ -58,28 +58,36 @@ const fontFaceCss = buildFontFaceCss();
  */
 export function renderToHtml(source, baseDir) {
   const options = {
-    standalone: true,
     safe: 'safe',
   };
   if (baseDir) {
     options.base_dir = baseDir;
   }
 
-  // Use load() + convert() to access document attributes
+  // Use load() to access document attributes and get the body HTML.
+  // We render with standalone:false to avoid Asciidoctor reading its CSS
+  // from the filesystem (which fails in Bun-compiled binaries). Instead,
+  // we wrap the body in a full HTML document ourselves with the pre-loaded
+  // Asciidoctor CSS and inline font-face declarations.
   const doc = asciidoctor.load(source, options);
   const attributes = doc.getAttributes();
-  let html = doc.convert();
+  const body = doc.convert();
 
-  // load() with standalone:true followed by convert() produces the body only.
-  // We need the full standalone HTML document, so re-convert with the
-  // processor directly to get the complete output including <html>/<head>.
-  html = asciidoctor.convert(source, options);
+  const title = doc.getDocumentTitle() || '';
 
-  // Replace external Google Fonts link with inline font-face declarations
-  html = html.replace(
-    /<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^"]*">/g,
-    `<style>${fontFaceCss}</style>`,
-  );
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title}</title>
+<style>${asciidoctorCss}</style>
+<style>${fontFaceCss}</style>
+</head>
+<body class="article">
+${body}
+</body>
+</html>`;
 
   return { html, attributes };
 }

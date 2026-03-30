@@ -5,8 +5,16 @@ import { registerWatchCommand } from './commands/watch.js';
 import { registerValidateCommand } from './commands/validate.js';
 import { registerInfoCommand } from './commands/info.js';
 
-const require = createRequire(import.meta.url);
-const { version } = require('../package.json');
+/* global PROVEN_DOCS_VERSION */
+// In Bun-compiled binaries, PROVEN_DOCS_VERSION is injected via --define.
+// In Node.js dev mode, fall back to reading package.json.
+let version;
+try {
+  version = PROVEN_DOCS_VERSION;
+} catch {
+  const require = createRequire(import.meta.url);
+  version = require('../package.json').version;
+}
 
 const program = new Command();
 
