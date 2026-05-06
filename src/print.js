@@ -35,13 +35,99 @@ export async function printToPdf(html, outputPath) {
     });
 
     await page.setContent(html, { waitUntil: 'load' });
+    await page.emulateMedia({ media: 'print' });
 
     // If mermaid blocks exist, load and execute mermaid.js in the browser
     if (hasMermaid) {
+      await page.addStyleTag({
+        content: `@media print {
+  .listingblock > .content > pre.mermaid {
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: visible !important;
+  }
+  .listingblock > .content > pre.mermaid > svg {
+    display: block;
+    margin: 0 auto;
+    max-width: 100% !important;
+    height: auto;
+  }
+}`,
+      });
+
       await page.addScriptTag({ content: mermaidJsContent });
 
       await page.evaluate(async () => {
         /* global mermaid */
+        const PX_PER_INCH = 96;
+        const MAX_DIAGRAM_HEIGHT_INCHES = 9.5;
+        const maxDiagramHeightPx = MAX_DIAGRAM_HEIGHT_INCHES * PX_PER_INCH;
+
+        const hasPercentDimension = (value) => String(value || '').trim().endsWith('%');
+
+        const readViewBoxSize = (svgEl) => {
+          const viewBox = svgEl.viewBox && svgEl.viewBox.baseVal;
+          if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+            return { width: viewBox.width, height: viewBox.height };
+          }
+          return null;
+        };
+
+        const normalizeIntrinsicSvgSize = (svgEl) => {
+          const viewBoxSize = readViewBoxSize(svgEl);
+          if (!viewBoxSize) return;
+
+          const widthAttr = svgEl.getAttribute('width');
+          const heightAttr = svgEl.getAttribute('height');
+          const shouldNormalize =
+            !widthAttr ||
+            !heightAttr ||
+            hasPercentDimension(widthAttr) ||
+            hasPercentDimension(heightAttr);
+
+          if (shouldNormalize) {
+            svgEl.setAttribute('width', String(viewBoxSize.width));
+            svgEl.setAttribute('height', String(viewBoxSize.height));
+          }
+        };
+
+        const measureRenderedSvgSize = (svgEl) => {
+          const rect = svgEl.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            return { width: rect.width, height: rect.height };
+          }
+          return readViewBoxSize(svgEl);
+        };
+
+        const fitSvgToSinglePage = (block, svgEl) => {
+          normalizeIntrinsicSvgSize(svgEl);
+          svgEl.style.maxWidth = '100%';
+          svgEl.style.width = '';
+          svgEl.style.height = '';
+          block.style.pageBreakInside = '';
+          block.style.breakInside = '';
+
+          const renderedSize = measureRenderedSvgSize(svgEl);
+          if (!renderedSize) return;
+
+          const heightScale = maxDiagramHeightPx / renderedSize.height;
+          const needsHeightFit = heightScale < 1;
+          const scale = Math.min(1, heightScale);
+
+          if (needsHeightFit) {
+            const scaledWidth = renderedSize.width * scale;
+            const scaledHeight = renderedSize.height * scale;
+            svgEl.style.width = `${scaledWidth}px`;
+            svgEl.style.height = `${scaledHeight}px`;
+            block.style.pageBreakInside = 'avoid';
+            block.style.breakInside = 'avoid-page';
+            block.setAttribute('data-page-fit', 'scaled');
+            block.setAttribute('data-page-fit-scale', scale.toFixed(3));
+          } else {
+            block.setAttribute('data-page-fit', 'native');
+          }
+        };
+
         mermaid.initialize({
           startOnLoad: false,
           theme: 'default',
@@ -55,6 +141,10 @@ export async function printToPdf(html, outputPath) {
             const id = 'mermaid-' + Math.random().toString(36).substring(2, 10);
             const { svg } = await mermaid.render(id, source);
             block.innerHTML = svg;
+            const svgEl = block.querySelector('svg');
+            if (svgEl) {
+              fitSvgToSinglePage(block, svgEl);
+            }
             block.setAttribute('data-processed', 'true');
           } catch (err) {
             block.innerHTML =
