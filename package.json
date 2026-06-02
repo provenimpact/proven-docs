@@ -28,7 +28,7 @@
   "dependencies": {
     "@asciidoctor/core": "^3.0.4",
     "chokidar": "^5.0.0",
-    "commander": "^14.0.3",
+    "commander": "^15.0.0",
     "highlight.js": "^11.11.1",
     "mermaid": "^11.13.0",
     "playwright-core": "^1.58.2"
